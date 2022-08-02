@@ -38,7 +38,7 @@ def respond_zip(handler, name, output, resources):
         return False
 
     # Headers
-    zip_filename = os.path.splitext(name)[0] + '.zip'
+    zip_filename = f'{os.path.splitext(name)[0]}.zip'
     handler.set_attachment_header(zip_filename)
     handler.set_header('Content-Type', 'application/zip')
     handler.set_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
@@ -61,19 +61,19 @@ def get_exporter(format, **kwargs):
     try:
         from nbconvert.exporters.base import get_exporter
     except ImportError as e:
-        raise web.HTTPError(500, "Could not import nbconvert: %s" % e) from e
+        raise web.HTTPError(500, f"Could not import nbconvert: {e}") from e
 
     try:
         Exporter = get_exporter(format)
     except KeyError as e:
         # should this be 400?
-        raise web.HTTPError(404, u"No exporter for format: %s" % format) from e
+        raise web.HTTPError(404, f"No exporter for format: {format}") from e
 
     try:
         return Exporter(**kwargs)
     except Exception as e:
         app_log.exception("Could not construct Exporter: %s", Exporter)
-        raise web.HTTPError(500, "Could not construct Exporter: %s" % e) from e
+        raise web.HTTPError(500, f"Could not construct Exporter: {e}") from e
 
 class NbconvertFileHandler(IPythonHandler):
 
@@ -83,7 +83,7 @@ class NbconvertFileHandler(IPythonHandler):
     def content_security_policy(self):
         # In case we're serving HTML/SVG, confine any Javascript to a unique
         # origin so it can't interact with the notebook server.
-        return super().content_security_policy + "; sandbox allow-scripts"
+        return f"{super().content_security_policy}; sandbox allow-scripts"
 
     @web.authenticated
     @gen.coroutine
@@ -132,7 +132,7 @@ class NbconvertFileHandler(IPythonHandler):
             )
         except Exception as e:
             self.log.exception("nbconvert failed: %s", e)
-            raise web.HTTPError(500, "nbconvert failed: %s" % e) from e
+            raise web.HTTPError(500, f"nbconvert failed: {e}") from e
 
         if respond_zip(self, name, output, resources):
             return
@@ -144,8 +144,7 @@ class NbconvertFileHandler(IPythonHandler):
 
         # MIME type
         if exporter.output_mimetype:
-            self.set_header('Content-Type',
-                            '%s; charset=utf-8' % exporter.output_mimetype)
+            self.set_header('Content-Type', f'{exporter.output_mimetype}; charset=utf-8')
 
         self.set_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         self.finish(output)
@@ -157,7 +156,7 @@ class NbconvertPostHandler(IPythonHandler):
     def content_security_policy(self):
         # In case we're serving HTML/SVG, confine any Javascript to a unique
         # origin so it can't interact with the notebook server.
-        return super().content_security_policy + "; sandbox allow-scripts"
+        return f"{super().content_security_policy}; sandbox allow-scripts"
 
     @web.authenticated
     def post(self, format):
@@ -173,15 +172,14 @@ class NbconvertPostHandler(IPythonHandler):
                 "config_dir": self.application.settings['config_dir'],
             })
         except Exception as e:
-            raise web.HTTPError(500, "nbconvert failed: %s" % e) from e
+            raise web.HTTPError(500, f"nbconvert failed: {e}") from e
 
         if respond_zip(self, name, output, resources):
             return
 
         # MIME type
         if exporter.output_mimetype:
-            self.set_header('Content-Type',
-                            '%s; charset=utf-8' % exporter.output_mimetype)
+            self.set_header('Content-Type', f'{exporter.output_mimetype}; charset=utf-8')
 
         self.finish(output)
 
@@ -194,7 +192,6 @@ _format_regex = r"(?P<format>\w+)"
 
 
 default_handlers = [
-    (r"/nbconvert/%s" % _format_regex, NbconvertPostHandler),
-    (r"/nbconvert/%s%s" % (_format_regex, path_regex),
-         NbconvertFileHandler),
+    (f"/nbconvert/{_format_regex}", NbconvertPostHandler),
+    (f"/nbconvert/{_format_regex}{path_regex}", NbconvertFileHandler),
 ]

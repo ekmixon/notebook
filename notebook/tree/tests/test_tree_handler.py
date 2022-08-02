@@ -27,7 +27,7 @@ class TreeTest(NotebookTestBase):
 
     def test_redirect(self):
         r = self.request('GET', 'tree/foo/bar.ipynb')
-        self.assertEqual(r.url, self.base_url() + 'notebooks/foo/bar.ipynb')
+        self.assertEqual(r.url, f'{self.base_url()}notebooks/foo/bar.ipynb')
 
         r = self.request('GET', 'tree/foo/baz.txt', allow_redirects=False)
         self.assertEqual(r.status_code, 302)

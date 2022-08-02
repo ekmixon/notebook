@@ -118,7 +118,7 @@ class TerminalAPITest(NotebookTestBase):
         r = r.history[0]
         foo_term = r.json()
         self.assertEqual(r.status_code, 302)
-        self.assertEqual(r.headers['Location'], self.url_prefix + "terminals/foo")
+        self.assertEqual(r.headers['Location'], f"{self.url_prefix}terminals/foo")
         self.assertIsInstance(foo_term, dict)
         self.assertEqual(foo_term['name'], 'foo')
 
@@ -169,7 +169,7 @@ class TerminalAPITest(NotebookTestBase):
         # Request a bad terminal id and check that a JSON
         # message is returned!
         bad_term = 'nonExistentTerm'
-        with assert_http_error(404, 'Terminal not found: ' + bad_term):
+        with assert_http_error(404, f'Terminal not found: {bad_term}'):
             self.term_api.get(bad_term)
 
         # DELETE terminal with name
@@ -180,7 +180,7 @@ class TerminalAPITest(NotebookTestBase):
 
         # Request to delete a non-existent terminal name
         bad_term = 'nonExistentTerm'
-        with assert_http_error(404, 'Terminal not found: ' + bad_term):
+        with assert_http_error(404, f'Terminal not found: {bad_term}'):
             self.term_api.shutdown(bad_term)
 
 
@@ -223,7 +223,7 @@ class TerminalCullingTest(NotebookTestBase):
         last_activity = body['last_activity']
 
         culled = False
-        for i in range(10):  # Culling should occur in a few seconds
+        for _ in range(10):
             try:
                 r = self.term_api.get(term1)
             except HTTPError as e:

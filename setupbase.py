@@ -70,7 +70,9 @@ version = version_ns['__version__']
 # vendored from pep440 package, we allow `.dev` suffix without trailing number.
 loose_pep440re = re.compile(r'^([1-9]\d*!)?(0|[1-9]\d*)(\.(0|[1-9]\d*))*((a|b|rc)(0|[1-9]\d*))?(\.post(0|[1-9]\d*))?(\.dev(0|[1-9]\d*)?)?$')
 if not loose_pep440re.match(version):
-    raise ValueError('Invalid version number `%s`, please follow pep440 convention or pip will get confused about which package is more recent.' % version)
+    raise ValueError(
+        f'Invalid version number `{version}`, please follow pep440 convention or pip will get confused about which package is more recent.'
+    )
 
 #---------------------------------------------------------------------------
 # Find packages
@@ -82,10 +84,10 @@ def find_packages():
     """
     packages = []
     for dir,subdirs,files in os.walk(name):
-        package = dir.replace(os.path.sep, '.')
         if '__init__.py' not in files:
             # not a package
             continue
+        package = dir.replace(os.path.sep, '.')
         packages.append(package)
     return packages
 
@@ -99,7 +101,7 @@ def find_package_data():
     """
     # This is not enough for these things to appear in a sdist.
     # We need to muck with the MANIFEST to get this to work
-    
+
     # exclude components and less from the walk;
     # we will build the components separately
     excludes = [
@@ -117,14 +119,14 @@ def find_package_data():
             # prevent descending into subdirs
             dirs[:] = []
             continue
-        for f in files:
-            static_data.append(pjoin(parent, f))
-    
+        static_data.extend(pjoin(parent, f) for f in files)
     # for verification purposes, explicitly add main.min.js
     # so that installation will fail if they are missing
-    for app in ['auth', 'edit', 'notebook', 'terminal', 'tree']:
-        static_data.append(pjoin('static', app, 'js', 'main.min.js'))
-    
+    static_data.extend(
+        pjoin('static', app, 'js', 'main.min.js')
+        for app in ['auth', 'edit', 'notebook', 'terminal', 'tree']
+    )
+
     components = pjoin("static", "components")
     # select the components we actually need to install
     # (there are lots of resources we bundle for sdist-reasons that we don't actually use)
@@ -162,9 +164,9 @@ def find_package_data():
 
     # Ship all of Codemirror's CSS and JS
     for parent, dirs, files in os.walk(pjoin(components, 'codemirror')):
-        for f in files:
-            if f.endswith(('.js', '.css')):
-                static_data.append(pjoin(parent, f))
+        static_data.extend(
+            pjoin(parent, f) for f in files if f.endswith(('.js', '.css'))
+        )
 
     # Trim mathjax
     mj = lambda *path: pjoin(components, 'MathJax', *path)
@@ -173,10 +175,10 @@ def find_package_data():
         mj('config', 'TeX-AMS-MML_HTMLorMML-full.js'),
         mj('config', 'Safe.js'),
     ])
-    
+
     trees = []
     mj_out = mj('jax', 'output')
-    
+
     if os.path.exists(mj_out):
         for output in os.listdir(mj_out):
             path = pjoin(mj_out, output)
@@ -195,23 +197,23 @@ def find_package_data():
         mj('jax', 'element', 'mml'),
     ]:
         for parent, dirs, files in os.walk(tree):
-            for f in files:
-                static_data.append(pjoin(parent, f))
-
+            static_data.extend(pjoin(parent, f) for f in files)
     os.chdir(os.path.join('tests',))
     js_tests = glob('*.js') + glob('*/*.js')
 
     os.chdir(cwd)
 
-    package_data = {
-        'notebook' : ['templates/*'] + static_data,
-        'notebook.tests' : js_tests,
-        'notebook.bundler.tests': ['resources/*', 'resources/*/*', 'resources/*/*/.*'],
+    return {
+        'notebook': ['templates/*'] + static_data,
+        'notebook.tests': js_tests,
+        'notebook.bundler.tests': [
+            'resources/*',
+            'resources/*/*',
+            'resources/*/*/.*',
+        ],
         'notebook.services.api': ['api.yaml'],
         'notebook.i18n': ['*/LC_MESSAGES/*.*'],
     }
-    
-    return package_data
 
 
 def check_package_data(package_data):
@@ -222,9 +224,9 @@ def check_package_data(package_data):
         for d in data:
             path = pjoin(pkg_root, d)
             if '*' in path:
-                assert len(glob(path)) > 0, "No files match pattern %s" % path
+                assert len(glob(path)) > 0, f"No files match pattern {path}"
             else:
-                assert os.path.exists(path), "Missing package data: %s" % path
+                assert os.path.exists(path), f"Missing package data: {path}"
 
 
 def check_package_data_first(command):
@@ -274,10 +276,7 @@ except ImportError:
         # than referring to PATH directories. This includes checking relative to the
         # current directory, e.g. ./script
         if os.path.dirname(cmd):
-            if _access_check(cmd, mode):
-                return cmd
-            return None
-
+            return cmd if _access_check(cmd, mode) else None
         if path is None:
             path = os.environ.get("PATH", os.defpath)
         if not path:
@@ -286,7 +285,7 @@ except ImportError:
 
         if sys.platform == "win32":
             # The current directory takes precedence on Windows.
-            if not os.curdir in path:
+            if os.curdir not in path:
                 path.insert(0, os.curdir)
 
             # PATHEXT is necessary to check on Windows.
@@ -307,7 +306,7 @@ except ImportError:
         seen = set()
         for dir in path:
             normdir = os.path.normcase(dir)
-            if not normdir in seen:
+            if normdir not in seen:
                 seen.add(normdir)
                 for thefile in files:
                     name = os.path.join(dir, thefile)
@@ -330,7 +329,7 @@ def mtime(path):
 
 def run(cmd, *args, **kwargs):
     """Echo a command before running it"""
-    log.info('> ' + list2cmdline(cmd))
+    log.info(f'> {list2cmdline(cmd)}')
     kwargs['shell'] = (sys.platform == 'win32')
     return check_call(cmd, *args, **kwargs)
 
@@ -351,13 +350,33 @@ class CompileBackendTranslation(Command):
         for p in paths:
             LANG = p[-5:]
             for component in ['notebook', 'nbui']:
-                run(['pybabel', 'compile',
-                     '-D', component,
-                     '-f',
-                     '-l', LANG,
-                     '-i', pjoin('notebook', 'i18n', LANG, 'LC_MESSAGES', component+'.po'),
-                     '-o', pjoin('notebook', 'i18n', LANG, 'LC_MESSAGES', component+'.mo')
-                    ])
+                run(
+                    [
+                        'pybabel',
+                        'compile',
+                        '-D',
+                        component,
+                        '-f',
+                        '-l',
+                        LANG,
+                        '-i',
+                        pjoin(
+                            'notebook',
+                            'i18n',
+                            LANG,
+                            'LC_MESSAGES',
+                            f'{component}.po',
+                        ),
+                        '-o',
+                        pjoin(
+                            'notebook',
+                            'i18n',
+                            LANG,
+                            'LC_MESSAGES',
+                            f'{component}.mo',
+                        ),
+                    ]
+                )
 
 class Bower(Command):
     description = "fetch static client-side components with bower"
@@ -394,23 +413,25 @@ class Bower(Command):
         if not which('npm'):
             print("npm unavailable", file=sys.stderr)
             return False
-        if not os.path.exists(self.node_modules):
-            return True
-        return mtime(self.node_modules) < mtime(pjoin(repo_root, 'package.json'))
+        return (
+            mtime(self.node_modules) < mtime(pjoin(repo_root, 'package.json'))
+            if os.path.exists(self.node_modules)
+            else True
+        )
 
     def run(self):
         if not self.should_run():
             print("bower dependencies up to date")
             return
-        
+
         if self.should_run_npm():
             print("installing build dependencies with npm")
             run(['npm', 'install'], cwd=repo_root)
             os.utime(self.node_modules, None)
-        
+
         env = os.environ.copy()
         env['PATH'] = npm_path
-        
+
         try:
             run(
                 ['bower', 'install', '--allow-root', '--config.interactive=false'],
@@ -418,7 +439,7 @@ class Bower(Command):
                 env=env
             )
         except OSError as e:
-            print("Failed to run bower: %s" % e, file=sys.stderr)
+            print(f"Failed to run bower: {e}", file=sys.stderr)
             print("You can install js dependencies with `npm install`", file=sys.stderr)
             raise
         # self.npm_components()
@@ -479,17 +500,23 @@ class CompileCSS(Command):
         env['PATH'] = npm_path
 
         patch_out_bootstrap_bw_print()
-        
+
         for src, dst in zip(self.sources, self.targets):
             try:
-                run(['lessc',
-                    '--source-map',
-                    '--include-path=%s' % pipes.quote(static),
-                    src,
-                    dst,
-                ], cwd=repo_root, env=env)
+                run(
+                    [
+                        'lessc',
+                        '--source-map',
+                        f'--include-path={pipes.quote(static)}',
+                        src,
+                        dst,
+                    ],
+                    cwd=repo_root,
+                    env=env,
+                )
+
             except OSError as e:
-                print("Failed to build css: %s" % e, file=sys.stderr)
+                print(f"Failed to build css: {e}", file=sys.stderr)
                 print("You can install js dependencies with `npm install`", file=sys.stderr)
                 raise
         # update package data in case this created new files
@@ -526,8 +553,7 @@ class CompileJS(Command):
                     yield f
         yield pjoin(static, 'services', 'config.js')
         if name == 'notebook':
-            for f in glob(pjoin(static, 'services', '*', '*.js')):
-                yield f
+            yield from glob(pjoin(static, 'services', '*', '*.js'))
         for parent, dirs, files in os.walk(pjoin(static, 'components')):
             if os.path.basename(parent) == 'MathJax':
                 # don't look in MathJax, since it takes forever to walk it
@@ -551,9 +577,9 @@ class CompileJS(Command):
         target = pjoin(static, name, 'js', 'main.min.js')
 
         if not self.should_run(name, target):
-            log.info("%s up to date" % target)
+            log.info(f"{target} up to date")
             return
-        log.info("Rebuilding %s" % target)
+        log.info(f"Rebuilding {target}")
         run(['node', 'tools/build-main.js', name])
 
     def build_jstranslation(self, trd):
@@ -606,6 +632,8 @@ class JavascriptVersion(Command):
 
 def css_js_prerelease(command, strict=False):
     """decorator for building minified js/css prior to another command"""
+
+
     class DecoratedCommand(command):
         def run(self):
             self.distribution.run_command('jsversion')
@@ -636,19 +664,22 @@ def css_js_prerelease(command, strict=False):
                     # die if strict or any targets didn't build
                     prefix = os.path.commonprefix([repo_root + os.sep] + missing)
                     missing = [ m[len(prefix):] for m in missing ]
-                    log.warn("rebuilding js and css failed. The following required files are missing: %s" % missing)
+                    log.warn(
+                        f"rebuilding js and css failed. The following required files are missing: {missing}"
+                    )
+
                     raise e
                 else:
                     log.warn("rebuilding js and css failed (not a problem)")
                     log.warn(str(e))
 
-            # check again for missing targets, just in case:
-            missing = [ t for t in targets if not os.path.exists(t) ]
-            if missing:
+            if missing := [t for t in targets if not os.path.exists(t)]:
                 # command succeeded, but targets still missing (?!)
                 prefix = os.path.commonprefix([repo_root + os.sep] + missing)
                 missing = [ m[len(prefix):] for m in missing ]
-                raise ValueError("The following required files are missing: %s" % missing)
+                raise ValueError(f"The following required files are missing: {missing}")
 
             command.run(self)
+
+
     return DecoratedCommand

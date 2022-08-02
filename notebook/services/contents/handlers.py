@@ -41,8 +41,7 @@ def validate_model(model, expect_content):
         "content",
         "format",
     }
-    missing = required_keys - set(model.keys())
-    if missing:
+    if missing := required_keys - set(model.keys()):
         raise web.HTTPError(
             500,
             u"Missing Model Keys: {missing}".format(missing=missing),
@@ -50,23 +49,18 @@ def validate_model(model, expect_content):
 
     maybe_none_keys = ['content', 'format']
     if expect_content:
-        errors = [key for key in maybe_none_keys if model[key] is None]
-        if errors:
+        if errors := [key for key in maybe_none_keys if model[key] is None]:
             raise web.HTTPError(
                 500,
                 u"Keys unexpectedly None: {keys}".format(keys=errors),
             )
-    else:
-        errors = {
-            key: model[key]
-            for key in maybe_none_keys
-            if model[key] is not None
-        }
-        if errors:
-            raise web.HTTPError(
-                500,
-                u"Keys unexpectedly not None: {keys}".format(keys=errors),
-            )
+    elif errors := {
+        key: model[key] for key in maybe_none_keys if model[key] is not None
+    }:
+        raise web.HTTPError(
+            500,
+            u"Keys unexpectedly not None: {keys}".format(keys=errors),
+        )
 
 
 class ContentsHandler(APIHandler):
@@ -193,7 +187,7 @@ class ContentsHandler(APIHandler):
 
         dir_exists = yield maybe_future(cm.dir_exists(path))
         if not dir_exists:
-            raise web.HTTPError(404, "No such directory: %s" % path)
+            raise web.HTTPError(404, f"No such directory: {path}")
 
         model = self.get_json_body()
 
@@ -221,8 +215,7 @@ class ContentsHandler(APIHandler):
           in `content` key of JSON request body. If content is not specified,
           create a new empty notebook.
         """
-        model = self.get_json_body()
-        if model:
+        if model := self.get_json_body():
             if model.get('copy_from'):
                 raise web.HTTPError(400, "Cannot copy with PUT, only POST")
             exists = yield maybe_future(self.contents_manager.file_exists(path))
@@ -323,10 +316,12 @@ class TrustNotebooksHandler(IPythonHandler):
 _checkpoint_id_regex = r"(?P<checkpoint_id>[\w-]+)"
 
 default_handlers = [
-    (r"/api/contents%s/checkpoints" % path_regex, CheckpointsHandler),
-    (r"/api/contents%s/checkpoints/%s" % (path_regex, _checkpoint_id_regex),
-        ModifyCheckpointsHandler),
-    (r"/api/contents%s/trust" % path_regex, TrustNotebooksHandler),
-    (r"/api/contents%s" % path_regex, ContentsHandler),
+    (f"/api/contents{path_regex}/checkpoints", CheckpointsHandler),
+    (
+        f"/api/contents{path_regex}/checkpoints/{_checkpoint_id_regex}",
+        ModifyCheckpointsHandler,
+    ),
+    (f"/api/contents{path_regex}/trust", TrustNotebooksHandler),
+    (f"/api/contents{path_regex}", ContentsHandler),
     (r"/api/notebooks/?(.*)", NotebooksRedirectHandler),
 ]

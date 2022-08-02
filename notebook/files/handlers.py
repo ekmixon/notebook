@@ -26,7 +26,7 @@ class FilesHandler(IPythonHandler):
     def content_security_policy(self):
         # In case we're serving HTML/SVG, confine any Javascript to a unique
         # origin so it can't interact with the notebook server.
-        return super().content_security_policy + "; sandbox allow-scripts"
+        return f"{super().content_security_policy}; sandbox allow-scripts"
 
     @web.authenticated
     def head(self, path):
@@ -49,27 +49,32 @@ class FilesHandler(IPythonHandler):
             _, name = path.rsplit('/', 1)
         else:
             name = path
-        
+
         model = yield maybe_future(cm.get(path, type='file', content=include_body))
-        
+
         if self.get_argument("download", False):
             self.set_attachment_header(name)
-        
+
         # get mimetype from filename
         if name.lower().endswith('.ipynb'):
             self.set_header('Content-Type', 'application/x-ipynb+json')
         else:
             cur_mime = mimetypes.guess_type(name)[0]
-            if cur_mime == 'text/plain':
+            if (
+                cur_mime != 'text/plain'
+                and cur_mime is None
+                and model['format'] == 'base64'
+            ):
+                self.set_header('Content-Type', 'application/octet-stream')
+            elif (
+                cur_mime != 'text/plain'
+                and cur_mime is None
+                or cur_mime == 'text/plain'
+            ):
                 self.set_header('Content-Type', 'text/plain; charset=UTF-8')
-            elif cur_mime is not None:
-                self.set_header('Content-Type', cur_mime)
-            else:
-                if model['format'] == 'base64':
-                    self.set_header('Content-Type', 'application/octet-stream')
-                else:
-                    self.set_header('Content-Type', 'text/plain; charset=UTF-8')
 
+            else:
+                self.set_header('Content-Type', cur_mime)
         if include_body:
             if model['format'] == 'base64':
                 b64_bytes = model['content'].encode('ascii')

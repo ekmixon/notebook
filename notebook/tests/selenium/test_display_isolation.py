@@ -58,7 +58,7 @@ def isolated_html(notebook):
     assert isolated_div.value_of_css_property("color") == blue
     notebook.browser.switch_to.default_content()
     # Clean up the html test cells
-    for i in range(1, len(notebook.cells)):
+    for _ in range(1, len(notebook.cells)):
         notebook.delete_cell(1)
 
 
@@ -92,5 +92,5 @@ def isolated_svg(notebook):
     assert isolated_svg_2.value_of_css_property("fill") == black
 
     # Clean up the svg test cells
-    for i in range(1, len(notebook.cells)):
+    for _ in range(1, len(notebook.cells)):
         notebook.delete_cell(1)

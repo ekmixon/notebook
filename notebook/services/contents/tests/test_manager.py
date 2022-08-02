@@ -91,15 +91,13 @@ class TestFileContentsManager(TestCase):
         cp_name = 'test-cp.ipynb'
         with TemporaryDirectory() as td:
             root = td
-            os.mkdir(os.path.join(td, subd))
+            os.mkdir(os.path.join(root, subd))
             fm = FileContentsManager(root_dir=root)
             cpm = fm.checkpoints
             cp_dir = cpm.checkpoint_path(
                 'cp', 'test.ipynb'
             )
-            cp_subdir = cpm.checkpoint_path(
-                'cp', '/%s/test.ipynb' % subd
-            )
+            cp_subdir = cpm.checkpoint_path('cp', f'/{subd}/test.ipynb')
         self.assertNotEqual(cp_dir, cp_subdir)
         self.assertEqual(cp_dir, os.path.join(root, cpm.checkpoint_dir, cp_name))
         self.assertEqual(cp_subdir, os.path.join(root, subd, cpm.checkpoint_dir, cp_name))
@@ -113,7 +111,7 @@ class TestFileContentsManager(TestCase):
             file_model = cm.new_untitled(path=path, ext='.txt')
 
             # create a broken symlink
-            self.symlink(cm, "target", '%s/%s' % (path, 'bad symlink'))
+            self.symlink(cm, "target", f'{path}/bad symlink')
             model = cm.get(path)
 
             contents = {
@@ -152,7 +150,7 @@ class TestFileContentsManager(TestCase):
             path = '{0}/{1}'.format(parent, name)
             _make_dir(cm, parent)
 
-            file_model = cm.new(path=parent + '/zfoo.txt')
+            file_model = cm.new(path=f'{parent}/zfoo.txt')
 
             # create a good symlink
             self.symlink(cm, file_model['path'], path)
@@ -309,7 +307,7 @@ class TestContentsManager(TestCase):
         self.assertIn('type', model)
         self.assertEqual(model['type'], 'file')
         self.assertEqual(model['name'], 'untitled')
-        self.assertEqual(model['path'], '%s/untitled' % sub_dir)
+        self.assertEqual(model['path'], f'{sub_dir}/untitled')
 
         # Test with a compound extension
         model = cm.new_untitled(path=sub_dir, ext='.foo.bar')
@@ -428,7 +426,7 @@ class TestContentsManager(TestCase):
             elif entry['path'] == file_model_no_content['path']:
                 self.assertEqual(entry, file_model_no_content)
             else:
-                self.fail("Unexpected directory entry: %s" % entry())
+                self.fail(f"Unexpected directory entry: {entry()}")
 
         with self.assertRaises(HTTPError):
             cm.get('foo', type='file')
@@ -460,7 +458,7 @@ class TestContentsManager(TestCase):
 
         # Change the name in the model for rename
         d = path.rsplit('/', 1)[0]
-        new_path = model['path'] = d + '/test_in_sub.ipynb'
+        new_path = model['path'] = f'{d}/test_in_sub.ipynb'
         model = cm.update(model, path)
         assert isinstance(model, dict)
         self.assertIn('name', model)

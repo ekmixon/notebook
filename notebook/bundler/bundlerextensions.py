@@ -34,7 +34,10 @@ def _get_bundler_metadata(module):
     """
     m = import_item(module)
     if not hasattr(m, '_jupyter_bundlerextension_paths'):
-        raise KeyError('The Python module {} does not contain a valid bundlerextension'.format(module))
+        raise KeyError(
+            f'The Python module {module} does not contain a valid bundlerextension'
+        )
+
     bundlers = m._jupyter_bundlerextension_paths()
     return m, bundlers
 
@@ -68,14 +71,13 @@ def _set_bundler_state(name, label, module_name, group, state,
     config_dir = os.path.join(
         _get_config_dir(user=user, sys_prefix=sys_prefix), 'nbconfig')
     cm = BaseJSONConfigManager(config_dir=config_dir)
-    
+
     if logger:
-        logger.info("{} {} bundler {}...".format(
-            "Enabling" if state else "Disabling",
-            name,
-            module_name
-        ))
-    
+        logger.info(
+            f'{"Enabling" if state else "Disabling"} {name} bundler {module_name}...'
+        )
+
+
     if state:
         cm.update(BUNDLER_SECTION, {
             BUNDLER_SUBSECTION: {
@@ -244,11 +246,11 @@ class ListBundlerExtensionApp(BaseExtensionApp):
     def list_nbextensions(self):
         """List all the nbextensions"""
         config_dirs = [os.path.join(p, 'nbconfig') for p in jupyter_config_path()]
-        
+
         print("Known bundlerextensions:")
-        
+
         for config_dir in config_dirs:
-            head = u'  config dir: {}'.format(config_dir)
+            head = f'  config dir: {config_dir}'
             head_shown = False
 
             cm = BaseJSONConfigManager(parent=self, config_dir=config_dir)
@@ -258,16 +260,14 @@ class ListBundlerExtensionApp(BaseExtensionApp):
                     # only show heading if there is an nbextension here
                     print(head)
                     head_shown = True
-                
+
                 for bundler_id, info in data['bundlerextensions'].items():
                     label = info.get('label')
                     module = info.get('module_name')
                     if label is None or module is None:
-                        msg = u'    {} {}'.format(bundler_id, RED_DISABLED)
+                        msg = f'    {bundler_id} {RED_DISABLED}'
                     else:
-                        msg = u'    "{}" from {} {}'.format(
-                            label, module, GREEN_ENABLED
-                        )
+                        msg = f'    "{label}" from {module} {GREEN_ENABLED}'
                     print(msg)
     
     def start(self):
@@ -299,7 +299,7 @@ jupyter bundlerextension disable --py <packagename>    # disable all bundlers in
         # The above should have called a subcommand and raised NoStart; if we
         # get here, it didn't, so we should self.log.info a message.
         subcmds = ", ".join(sorted(self.subcommands))
-        sys.exit("Please supply at least one subcommand: %s" % subcmds)
+        sys.exit(f"Please supply at least one subcommand: {subcmds}")
 
 main = BundlerExtensionApp.launch_instance
 

@@ -8,13 +8,10 @@ from notebook.tests.launchnotebook import NotebookTestBase
 
 class LoginTest(NotebookTestBase):
     def login(self, next):
-        first = requests.get(self.base_url() + "login")
+        first = requests.get(f"{self.base_url()}login")
         first.raise_for_status()
         resp = requests.post(
-            url_concat(
-                self.base_url() + "login",
-                {'next': next},
-            ),
+            url_concat(f"{self.base_url()}login", {'next': next}),
             allow_redirects=False,
             data={
                 "password": self.token,
@@ -22,27 +19,18 @@ class LoginTest(NotebookTestBase):
             },
             cookies=first.cookies,
         )
+
         resp.raise_for_status()
         return resp.headers['Location']
 
     def test_next_bad(self):
-        for bad_next in (
-            "//some-host",
-            "//host" + self.url_prefix + "tree",
-            "https://google.com",
-            "/absolute/not/base_url",
-        ):
+        for bad_next in ("//some-host", f"//host{self.url_prefix}tree", "https://google.com", "/absolute/not/base_url"):
             url = self.login(next=bad_next)
             self.assertEqual(url, self.url_prefix)
         assert url
 
     def test_next_ok(self):
-        for next_path in (
-            "tree/",
-            "//" + self.url_prefix + "tree",
-            "notebooks/notebook.ipynb",
-            "tree//something",
-        ):
+        for next_path in ("tree/", f"//{self.url_prefix}tree", "notebooks/notebook.ipynb", "tree//something"):
             expected = self.url_prefix + next_path
             actual = self.login(next=expected)
             self.assertEqual(actual, expected)

@@ -156,7 +156,7 @@ def random_ports(port, n):
     """
     for i in range(min(5, n)):
         yield port + i
-    for i in range(n-5):
+    for _ in range(n-5):
         yield max(1, port + random.randint(-2*n, 2*n))
 
 def load_handlers(name):
@@ -203,7 +203,7 @@ class NotebookWebApplication(web.Application):
         template_path = [os.path.expanduser(path) for path in _template_path]
 
         jenv_opt = {"autoescape": True}
-        jenv_opt.update(jinja_env_options if jinja_env_options else {})
+        jenv_opt |= jinja_env_options or {}
 
         env = Environment(loader=FileSystemLoader(template_path), extensions=['jinja2.ext.i18n'], **jenv_opt)
         sys_info = get_sys_info()
@@ -244,7 +244,7 @@ class NotebookWebApplication(web.Application):
         home = py3compat.str_to_unicode(os.path.expanduser('~'), encoding=sys.getfilesystemencoding())
         if root_dir.startswith(home + os.path.sep):
             # collapse $HOME to ~
-            root_dir = '~' + root_dir[len(home):]
+            root_dir = f'~{root_dir[len(home):]}'
 
         # Use the NotebookApp logger and its formatting for tornado request logging.
         log_function = functools.partial(
@@ -313,7 +313,7 @@ class NotebookWebApplication(web.Application):
         )
 
         # allow custom overrides for the tornado web app.
-        settings.update(settings_overrides)
+        settings |= settings_overrides
         return settings
 
     def init_handlers(self, settings):
@@ -325,8 +325,13 @@ class NotebookWebApplication(web.Application):
         for service in settings['extra_services']:
             handlers.extend(load_handlers(service))
         handlers.extend(load_handlers('notebook.tree.handlers'))
-        handlers.extend([(r"/login", settings['login_handler_class'])])
-        handlers.extend([(r"/logout", settings['logout_handler_class'])])
+        handlers.extend(
+            [
+                (r"/login", settings['login_handler_class']),
+                (r"/logout", settings['logout_handler_class']),
+            ]
+        )
+
         handlers.extend(load_handlers('notebook.files.handlers'))
         handlers.extend(load_handlers('notebook.view.handlers'))
         handlers.extend(load_handlers('notebook.notebook.handlers'))
@@ -351,24 +356,35 @@ class NotebookWebApplication(web.Application):
             # for each handler required for gateway, locate its pattern
             # in the current list and replace that entry...
             gateway_handlers = load_handlers('notebook.gateway.handlers')
-            for i, gwh in enumerate(gateway_handlers):
+            for gwh in gateway_handlers:
                 for j, h in enumerate(handlers):
                     if gwh[0] == h[0]:
                         handlers[j] = (gwh[0], gwh[1])
                         break
 
-        handlers.append(
-            (r"/nbextensions/(.*)", FileFindHandler, {
-                'path': settings['nbextensions_path'],
-                'no_cache_paths': ['/'], # don't cache anything in nbextensions
-            }),
+        handlers.extend(
+            (
+                (
+                    r"/nbextensions/(.*)",
+                    FileFindHandler,
+                    {
+                        'path': settings['nbextensions_path'],
+                        'no_cache_paths': [
+                            '/'
+                        ],  # don't cache anything in nbextensions
+                    },
+                ),
+                (
+                    r"/custom/(.*)",
+                    FileFindHandler,
+                    {
+                        'path': settings['static_custom_path'],
+                        'no_cache_paths': ['/'],  # don't cache anything in custom
+                    },
+                ),
+            )
         )
-        handlers.append(
-            (r"/custom/(.*)", FileFindHandler, {
-                'path': settings['static_custom_path'],
-                'no_cache_paths': ['/'], # don't cache anything in custom
-            })
-        )
+
         # register base handlers last
         handlers.extend(load_handlers('notebook.base.handlers'))
         # set the URL that will be redirected from `/`
@@ -426,7 +442,7 @@ class NotebookPasswordApp(JupyterApp):
     def start(self):
         from .auth.security import set_password
         set_password(config_file=self.config_file)
-        self.log.info("Wrote hashed password to %s" % self.config_file)
+        self.log.info(f"Wrote hashed password to {self.config_file}")
 
 
 def shutdown_server(server_info, timeout=5, log=None):
@@ -468,9 +484,13 @@ def shutdown_server(server_info, timeout=5, log=None):
 
         resolver = UnixSocketResolver(resolver=Resolver())
 
-    req = HTTPRequest(url + 'api/shutdown', method='POST', body=b'', headers={
-        'Authorization': 'token ' + server_info['token']
-    })
+    req = HTTPRequest(
+        f'{url}api/shutdown',
+        method='POST',
+        body=b'',
+        headers={'Authorization': 'token ' + server_info['token']},
+    )
+
     if log: log.debug("POST request to %sapi/shutdown", url)
     AsyncHTTPClient.configure(None, resolver=resolver)
     HTTPClient(AsyncHTTPClient).fetch(req)
@@ -523,7 +543,7 @@ class NbserverStopApp(JupyterApp):
         return shutdown_server(server, log=self.log)
 
     def _shutdown_or_exit(self, target_endpoint, server):
-        print("Shutting down server on %s..." % target_endpoint)
+        print(f"Shutting down server on {target_endpoint}...")
         server_stopped = self.shutdown_server(server)
         if not server_stopped and sys.platform.startswith('win'):
             # the pid check on Windows appears to be unreliable, so fetch another
@@ -533,7 +553,7 @@ class NbserverStopApp(JupyterApp):
             if server not in servers:
                 server_stopped = True
         if not server_stopped:
-            sys.exit("Could not stop server on %s" % target_endpoint)
+            sys.exit(f"Could not stop server on {target_endpoint}")
 
     @staticmethod
     def _maybe_remove_unix_socket(socket_path):
@@ -545,7 +565,7 @@ class NbserverStopApp(JupyterApp):
     def start(self):
         servers = list(list_running_servers(self.runtime_dir))
         if not servers:
-            self.exit("There are no running servers (per %s)" % self.runtime_dir)
+            self.exit(f"There are no running servers (per {self.runtime_dir})")
 
         for server in servers:
             if self.sock:
@@ -560,16 +580,16 @@ class NbserverStopApp(JupyterApp):
                 if port == self.port:
                     self._shutdown_or_exit(port, server)
                     return
-        else:
-            current_endpoint = self.sock or self.port
-            print(
-                "There is currently no server running on {}".format(current_endpoint),
-                file=sys.stderr
-            )
-            print("Ports/sockets currently in use:", file=sys.stderr)
-            for server in servers:
-                print("  - {}".format(server.get('sock') or server['port']), file=sys.stderr)
-            self.exit(1)
+        current_endpoint = self.sock or self.port
+        print(
+            f"There is currently no server running on {current_endpoint}",
+            file=sys.stderr,
+        )
+
+        print("Ports/sockets currently in use:", file=sys.stderr)
+        for server in servers:
+            print(f"  - {server.get('sock') or server['port']}", file=sys.stderr)
+        self.exit(1)
 
 
 class NbserverListApp(JupyterApp):
@@ -604,7 +624,7 @@ class NbserverListApp(JupyterApp):
             for serverinfo in serverinfo_list:
                 url = serverinfo['url']
                 if serverinfo.get('token'):
-                    url = url + '?token=%s' % serverinfo['token']
+                    url = url + f"?token={serverinfo['token']}"
                 print(url, "::", serverinfo['notebook_dir'])
 
 #-----------------------------------------------------------------------------
@@ -648,13 +668,15 @@ flags['autoreload'] = (
 )
 
 # Add notebook manager flags
-flags.update(boolean_flag('script', 'FileContentsManager.save_script',
-               'DEPRECATED, IGNORED',
-               'DEPRECATED, IGNORED'))
+flags |= boolean_flag(
+    'script',
+    'FileContentsManager.save_script',
+    'DEPRECATED, IGNORED',
+    'DEPRECATED, IGNORED',
+)
 
-aliases = dict(base_aliases)
 
-aliases.update({
+aliases = dict(base_aliases) | {
     'ip': 'NotebookApp.ip',
     'port': 'NotebookApp.port',
     'port-retries': 'NotebookApp.port_retries',
@@ -668,7 +690,7 @@ aliases.update({
     'browser': 'NotebookApp.browser',
     'pylab': 'NotebookApp.pylab',
     'gateway-url': 'GatewayClient.url',
-})
+}
 
 #-----------------------------------------------------------------------------
 # NotebookApp
@@ -909,8 +931,9 @@ class NotebookApp(JupyterApp):
             ) from e
         except AssertionError as e:
             raise TraitError(
-                'invalid --sock-mode value: %s, must have u+rw (0600) at a minimum' % value
+                f'invalid --sock-mode value: {value}, must have u+rw (0600) at a minimum'
             ) from e
+
         return value
 
 
@@ -1265,9 +1288,9 @@ class NotebookApp(JupyterApp):
     def _update_base_url(self, proposal):
         value = proposal['value']
         if not value.startswith('/'):
-            value = '/' + value
+            value = f'/{value}'
         if not value.endswith('/'):
-            value = value + '/'
+            value = f'{value}/'
         return value
 
     base_project_url = Unicode('/', config=True, help=_("""DEPRECATED use base_url"""))
@@ -1468,14 +1491,14 @@ class NotebookApp(JupyterApp):
 
     @default('info_file')
     def _default_info_file(self):
-        info_file = "nbserver-%s.json" % os.getpid()
+        info_file = f"nbserver-{os.getpid()}.json"
         return os.path.join(self.runtime_dir, info_file)
 
     browser_open_file = Unicode()
 
     @default('browser_open_file')
     def _default_browser_open_file(self):
-        basename = "nbserver-%s-open.html" % os.getpid()
+        basename = f"nbserver-{os.getpid()}-open.html"
         return os.path.join(self.runtime_dir, basename)
 
     pylab = Unicode('disabled', config=True,
@@ -1487,10 +1510,7 @@ class NotebookApp(JupyterApp):
     @observe('pylab')
     def _update_pylab(self, change):
         """when --pylab is specified, display a warning and exit"""
-        if change['new'] != 'warn':
-            backend = ' %s' % change['new']
-        else:
-            backend = ''
+        backend = f" {change['new']}" if change['new'] != 'warn' else ''
         self.log.error(_("Support for specifying --pylab on the command line has been removed."))
         self.log.error(
             _("Please use `%pylab{0}` or `%matplotlib{0}` in the notebook itself.").format(backend)
@@ -1589,7 +1609,7 @@ class NotebookApp(JupyterApp):
     def _default_authenticate_prometheus(self):
         """ Authenticate Prometheus by default, unless auth is disabled. """
         auth = bool(self.password) or bool(self.token)
-        if auth is False:
+        if not auth:
             self.log.info(_("Authentication of /metrics is OFF, since other authentication is disabled."))
         return auth
 
@@ -1655,8 +1675,10 @@ class NotebookApp(JupyterApp):
             if not async_kernel_mgmt_available:  # Can be removed once jupyter_client >= 6.1 is required.
                 raise ValueError("You are using `AsyncMappingKernelManager` without an appropriate "
                                  "jupyter_client installed!  Please upgrade jupyter_client or change kernel managers.")
-            self.log.info("Asynchronous kernel management has been configured to use '{}'.".
-                          format(self.kernel_manager.__class__.__name__))
+            self.log.info(
+                f"Asynchronous kernel management has been configured to use '{self.kernel_manager.__class__.__name__}'."
+            )
+
 
         self.contents_manager = self.contents_manager_class(
             parent=self,
@@ -1701,8 +1723,9 @@ class NotebookApp(JupyterApp):
             if hard < soft:
                 hard = soft
             self.log.debug(
-                'Raising open file limit: soft {}->{}; hard {}->{}'.format(old_soft, soft, old_hard, hard)
+                f'Raising open file limit: soft {old_soft}->{soft}; hard {old_hard}->{hard}'
             )
+
             resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))
 
     def init_webapp(self):
@@ -1752,8 +1775,11 @@ class NotebookApp(JupyterApp):
 
             if sys.platform.startswith('win'):
                 self.log.critical(
-                    _('Option --sock is not supported on Windows, but got value of %s. Aborting.' % self.sock),
+                    _(
+                        f'Option --sock is not supported on Windows, but got value of {self.sock}. Aborting.'
+                    )
                 )
+
                 sys.exit(1)
 
         self.web_app = NotebookWebApplication(
@@ -1866,10 +1892,7 @@ class NotebookApp(JupyterApp):
         elif self.sock:
             url = self._unix_sock_url()
         else:
-            if self.ip in ('', '0.0.0.0'):
-                ip = "%s" % socket.gethostname()
-            else:
-                ip = self.ip
+            ip = f"{socket.gethostname()}" if self.ip in ('', '0.0.0.0') else self.ip
             url = self._tcp_url(ip)
         if self.token and not self.sock:
             url = self._concat_token(url)
@@ -1881,12 +1904,11 @@ class NotebookApp(JupyterApp):
     def connection_url(self):
         if self.sock:
             return self._unix_sock_url()
-        else:
-            ip = self.ip if self.ip else 'localhost'
-            return self._tcp_url(ip)
+        ip = self.ip or 'localhost'
+        return self._tcp_url(ip)
 
     def _unix_sock_url(self, token=None):
-        return '%s%s' % (urlencode_unix_socket(self.sock), self.base_url)
+        return f'{urlencode_unix_socket(self.sock)}{self.base_url}'
 
     def _tcp_url(self, ip, port=None):
         proto = 'https' if self.certfile else 'http'
@@ -1991,7 +2013,7 @@ class NotebookApp(JupyterApp):
         for modulename in self.server_extensions:
             # Don't override disable state of the extension if it already exist
             # in the new traitlet
-            if not modulename in self.nbserver_extensions:
+            if modulename not in self.nbserver_extensions:
                 self.nbserver_extensions[modulename] = True
 
         # Load server extensions with ConfigManager.
@@ -2171,17 +2193,18 @@ class NotebookApp(JupyterApp):
 
     def server_info(self):
         """Return a JSONable dict of information about this server."""
-        return {'url': self.connection_url,
-                'hostname': self.ip if self.ip else 'localhost',
-                'port': self.port,
-                'sock': self.sock,
-                'secure': bool(self.certfile),
-                'base_url': self.base_url,
-                'token': self.token,
-                'notebook_dir': os.path.abspath(self.notebook_dir),
-                'password': bool(self.password),
-                'pid': os.getpid(),
-               }
+        return {
+            'url': self.connection_url,
+            'hostname': self.ip or 'localhost',
+            'port': self.port,
+            'sock': self.sock,
+            'secure': bool(self.certfile),
+            'base_url': self.base_url,
+            'token': self.token,
+            'notebook_dir': os.path.abspath(self.notebook_dir),
+            'password': bool(self.password),
+            'pid': os.getpid(),
+        }
 
     def write_server_info_file(self):
         """Write the result of server_info() to the JSON file info_file."""
@@ -2314,36 +2337,54 @@ class NotebookApp(JupyterApp):
             self.launch_browser()
 
         if self.token and self._token_generated:
-            # log full URL with generated token, so there's a copy/pasteable link
-            # with auth info.
             if self.sock:
-                self.log.critical('\n'.join([
-                    '\n',
-                    'Notebook is listening on %s' % self.display_url,
-                    '',
-                    (
-                        'UNIX sockets are not browser-connectable, but you can tunnel to '
-                        'the instance via e.g.`ssh -L 8888:%s -N user@this_host` and then '
-                        'open e.g. %s in a browser.'
-                    ) % (self.sock, self._concat_token(self._tcp_url('localhost', 8888)))
-                ]))
+                self.log.critical(
+                    '\n'.join(
+                        [
+                            '\n',
+                            f'Notebook is listening on {self.display_url}',
+                            '',
+                            (
+                                'UNIX sockets are not browser-connectable, but you can tunnel to '
+                                'the instance via e.g.`ssh -L 8888:%s -N user@this_host` and then '
+                                'open e.g. %s in a browser.'
+                            )
+                            % (
+                                self.sock,
+                                self._concat_token(
+                                    self._tcp_url('localhost', 8888)
+                                ),
+                            ),
+                        ]
+                    )
+                )
+
+            elif self.custom_display_url:
+                self.log.critical(
+                    '\n'.join(
+                        [
+                            '\n',
+                            'To access the notebook, open this file in a browser:',
+                            f"    {urljoin('file:', pathname2url(self.browser_open_file))}",
+                            'Or copy and paste this URL:',
+                            f'    {self.display_url}',
+                        ]
+                    )
+                )
+
+
             else:
-                if not self.custom_display_url:
-                    self.log.critical('\n'.join([
-                        '\n',
-                        'To access the notebook, open this file in a browser:',
-                        '    %s' % urljoin('file:', pathname2url(self.browser_open_file)),
-                        'Or copy and paste one of these URLs:',
-                        '    %s' % self.display_url,
-                    ]))
-                else:
-                    self.log.critical('\n'.join([
-                        '\n',
-                        'To access the notebook, open this file in a browser:',
-                        '    %s' % urljoin('file:', pathname2url(self.browser_open_file)),
-                        'Or copy and paste this URL:',
-                        '    %s' % self.display_url,
-                    ]))
+                self.log.critical(
+                    '\n'.join(
+                        [
+                            '\n',
+                            'To access the notebook, open this file in a browser:',
+                            f"    {urljoin('file:', pathname2url(self.browser_open_file))}",
+                            'Or copy and paste one of these URLs:',
+                            f'    {self.display_url}',
+                        ]
+                    )
+                )
 
         self.io_loop = ioloop.IOLoop.current()
         if sys.platform.startswith('win'):

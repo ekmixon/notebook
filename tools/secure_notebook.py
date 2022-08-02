@@ -33,34 +33,36 @@ def create_self_signed_cert(cert_dir, keyfile, certfile):
     """
 
     if exists(join(cert_dir, certfile))  or exists(join(cert_dir, keyfile)):
-        raise FileExistsError('{} or {} already exist in {}. Aborting.'.format(keyfile, certfile, cert_dir))
-    else:
-        # create a key pair
-        k = crypto.PKey()
-        k.generate_key(crypto.TYPE_RSA, 1024)
+        raise FileExistsError(
+            f'{keyfile} or {certfile} already exist in {cert_dir}. Aborting.'
+        )
 
-        # create a self-signed cert
-        cert = crypto.X509()
-        cert.get_subject().C = "US"
-        cert.get_subject().ST = "Jupyter notebook self-signed certificate"
-        cert.get_subject().L = "Jupyter notebook self-signed certificate"
-        cert.get_subject().O = "Jupyter notebook self-signed certificate"
-        cert.get_subject().OU = "my organization"
-        cert.get_subject().CN = "Jupyter notebook self-signed certificate"
-        cert.set_serial_number(1000)
-        cert.gmtime_adj_notBefore(0)
-        cert.gmtime_adj_notAfter(365*24*60*60)
-        cert.set_issuer(cert.get_subject())
-        cert.set_pubkey(k)
-        cert.sign(k, 'sha256')
+    # create a key pair
+    k = crypto.PKey()
+    k.generate_key(crypto.TYPE_RSA, 1024)
 
-        with io.open(join(cert_dir, certfile), "wt") as f:
-            f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode('utf8'))
-        os.chmod(join(cert_dir, certfile), 0o600)
-        
-        with io.open(join(cert_dir, keyfile), "wt") as f:
-            f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, k).decode('utf8'))
-        os.chmod(join(cert_dir, keyfile), 0o600)
+    # create a self-signed cert
+    cert = crypto.X509()
+    cert.get_subject().C = "US"
+    cert.get_subject().ST = "Jupyter notebook self-signed certificate"
+    cert.get_subject().L = "Jupyter notebook self-signed certificate"
+    cert.get_subject().O = "Jupyter notebook self-signed certificate"
+    cert.get_subject().OU = "my organization"
+    cert.get_subject().CN = "Jupyter notebook self-signed certificate"
+    cert.set_serial_number(1000)
+    cert.gmtime_adj_notBefore(0)
+    cert.gmtime_adj_notAfter(365*24*60*60)
+    cert.set_issuer(cert.get_subject())
+    cert.set_pubkey(k)
+    cert.sign(k, 'sha256')
+
+    with io.open(join(cert_dir, certfile), "wt") as f:
+        f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode('utf8'))
+    os.chmod(join(cert_dir, certfile), 0o600)
+
+    with io.open(join(cert_dir, keyfile), "wt") as f:
+        f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, k).decode('utf8'))
+    os.chmod(join(cert_dir, keyfile), 0o600)
 
 
 

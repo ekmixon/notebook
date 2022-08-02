@@ -1,10 +1,10 @@
 
 def cell_is_deletable(nb, index):
-    JS = 'return Jupyter.notebook.get_cell({}).is_deletable();'.format(index)
+    JS = f'return Jupyter.notebook.get_cell({index}).is_deletable();'
     return nb.browser.execute_script(JS)
 
 def remove_all_cells(notebook):
-    for i in range(len(notebook.cells)):
+    for _ in range(len(notebook.cells)):
         notebook.delete_cell(0)
 
 INITIAL_CELLS = ['print("a")', 'print("b")', 'print("c")']
@@ -15,16 +15,16 @@ def test_delete_cells(prefill_notebook):
 
     # Validate initial state
     assert notebook.get_cells_contents() == [a, b, c]
-    for cell in range(0, 3):
+    for cell in range(3):
         assert cell_is_deletable(notebook, cell)
 
     notebook.set_cell_metadata(0, 'deletable', 'false')
     notebook.set_cell_metadata(1, 'deletable', 0
-    )   
+    )
     assert not cell_is_deletable(notebook, 0)
     assert cell_is_deletable(notebook, 1)
     assert cell_is_deletable(notebook, 2)
-    
+
     # Try to delete cell a (should not be deleted)
     notebook.delete_cell(0)
     assert notebook.get_cells_contents() == [a, b, c]

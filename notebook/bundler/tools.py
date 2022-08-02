@@ -28,8 +28,7 @@ def get_file_references(abs_nb_path, version):
         Filename strings relative to the notebook path
     """
     ref_patterns = get_reference_patterns(abs_nb_path, version)
-    expanded = expand_references(os.path.dirname(abs_nb_path), ref_patterns)
-    return expanded
+    return expand_references(os.path.dirname(abs_nb_path), ref_patterns)
 
 def get_reference_patterns(abs_nb_path, version):
     """Gets a list of reference patterns either in Markdown fenced code blocks
@@ -50,8 +49,7 @@ def get_reference_patterns(abs_nb_path, version):
     notebook = nbformat.read(abs_nb_path, version)
     referenced_list = []
     for cell in notebook.cells:
-        references = get_cell_reference_patterns(cell)
-        if references:
+        if references := get_cell_reference_patterns(cell):
             referenced_list = referenced_list + references
     return referenced_list
 
@@ -147,24 +145,22 @@ def expand_references(root_path, references):
     negations = []
     must_walk = []
     for pattern in references:
-        if pattern and pattern.find(os.sep) < 0:
-            # simple shell glob
-            cwd = os.getcwd()
-            os.chdir(root_path)
-            if pattern.startswith('!'):
-                negations = negations + glob.glob(pattern[1:])
+        if pattern:
+            if pattern.find(os.sep) < 0:
+                # simple shell glob
+                cwd = os.getcwd()
+                os.chdir(root_path)
+                if pattern.startswith('!'):
+                    negations = negations + glob.glob(pattern[1:])
+                else:
+                    globbed = globbed + glob.glob(pattern)
+                os.chdir(cwd)
             else:
-                globbed = globbed + glob.glob(pattern)
-            os.chdir(cwd)
-        elif pattern:
-            must_walk.append(pattern)
+                must_walk.append(pattern)
 
     for pattern in must_walk:
         pattern_is_negation = pattern.startswith('!')
-        if pattern_is_negation:
-            testpattern = pattern[1:]
-        else:
-            testpattern = pattern
+        testpattern = pattern[1:] if pattern_is_negation else pattern
         for root, _, filenames in os.walk(root_path):
             for filename in filenames:
                 joined = os.path.join(root[len(root_path) + 1:], filename)
@@ -177,19 +173,20 @@ def expand_references(root_path, references):
                 elif testpattern.find('**') >= 0:
                     # path wildcard
                     ends = testpattern.split('**')
-                    if len(ends) == 2:
-                        if joined.startswith(ends[0]) and joined.endswith(ends[1]):
-                            if pattern_is_negation:
-                                negations.append(joined)
-                            else:
-                                globbed.append(joined)
-                else:
-                    # segments should be respected
-                    if fnmatch.fnmatch(joined, testpattern):
+                    if (
+                        len(ends) == 2
+                        and joined.startswith(ends[0])
+                        and joined.endswith(ends[1])
+                    ):
                         if pattern_is_negation:
                             negations.append(joined)
                         else:
                             globbed.append(joined)
+                elif fnmatch.fnmatch(joined, testpattern):
+                    if pattern_is_negation:
+                        negations.append(joined)
+                    else:
+                        globbed.append(joined)
 
     for negated in negations:
         try:
@@ -216,15 +213,12 @@ def copy_filelist(src, dst, src_relative_filenames):
     for filename in src_relative_filenames:
         # Only consider the file if it exists in src
         if os.path.isfile(os.path.join(src, filename)):
-            parent_relative = os.path.dirname(filename)
-            if parent_relative:
+            if parent_relative := os.path.dirname(filename):
                 # Make sure the parent directory exists
                 parent_dst = os.path.join(dst, parent_relative)
                 try:
                     os.makedirs(parent_dst)
                 except OSError as exc:
-                    if exc.errno == errno.EEXIST:
-                        pass
-                    else:
+                    if exc.errno != errno.EEXIST:
                         raise exc
             shutil.copy2(os.path.join(src, filename), os.path.join(dst, filename))

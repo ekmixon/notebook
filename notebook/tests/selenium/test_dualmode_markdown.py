@@ -6,8 +6,9 @@ from .utils import cmdtrl, shift, validate_dualmode_state
 
 def test_dualmode_markdown(notebook):
     def is_cell_rendered(index):
-        JS = 'return !!IPython.notebook.get_cell(%s).rendered;'%index
+        JS = f'return !!IPython.notebook.get_cell({index}).rendered;'
         return notebook.browser.execute_script(JS)
+
 
 
     a = 'print("a")'
@@ -20,7 +21,7 @@ def test_dualmode_markdown(notebook):
     notebook.body.send_keys("m")
     assert notebook.get_cell_type(index) == 'markdown'
     assert not is_cell_rendered(index) #cell is not rendered
-    
+
     notebook.body.send_keys(Keys.ENTER)#cell is unrendered
     assert not is_cell_rendered(index) #cell is not rendered
     validate_dualmode_state(notebook, 'edit', index)

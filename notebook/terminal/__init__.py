@@ -5,7 +5,10 @@ import terminado
 from ..utils import check_version
 
 if not check_version(terminado.__version__, '0.8.3'):
-    raise ImportError("terminado >= 0.8.3 required, found %s" % terminado.__version__)
+    raise ImportError(
+        f"terminado >= 0.8.3 required, found {terminado.__version__}"
+    )
+
 
 from ipython_genutils.py3compat import which
 from notebook.utils import url_path_join as ujoin
@@ -15,10 +18,7 @@ from . import api_handlers
 
 
 def initialize(nb_app):
-    if os.name == 'nt':
-        default_shell = 'powershell.exe'
-    else:
-        default_shell = which('sh')
+    default_shell = 'powershell.exe' if os.name == 'nt' else which('sh')
     shell_override = nb_app.terminado_settings.get('shell_command')
     shell = (
         [os.environ.get('SHELL') or default_shell]

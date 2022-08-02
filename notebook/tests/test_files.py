@@ -30,7 +30,7 @@ class FilesTest(NotebookTestBase):
             u'å b/.ç d',
         ]
         dirs = not_hidden + hidden
-        
+
         nbdir = self.notebook_dir
         for d in dirs:
             path = pjoin(nbdir, d.replace('/', os.sep))
@@ -119,11 +119,11 @@ class FilesTest(NotebookTestBase):
     
     def test_download(self):
         nbdir = self.notebook_dir
-        
+
         text = 'hello'
         with open(pjoin(nbdir, 'test.txt'), 'w') as f:
             f.write(text)
-        
+
         r = self.request('GET', 'files/test.txt')
         disposition = r.headers.get('Content-Disposition', '')
         self.assertNotIn('attachment', disposition)
@@ -135,42 +135,42 @@ class FilesTest(NotebookTestBase):
         
     def test_view_html(self):
         nbdir = self.notebook_dir
-        
+
         html = '<div>Test test</div>'
         with open(pjoin(nbdir, 'test.html'), 'w') as f:
             f.write(html)
-        
+
         r = self.request('GET', 'view/test.html')
         self.assertEqual(r.status_code, 200)
 
     def test_old_files_redirect(self):
         """pre-2.0 'files/' prefixed links are properly redirected"""
         nbdir = self.notebook_dir
-        
+
         os.mkdir(pjoin(nbdir, 'files'))
         os.makedirs(pjoin(nbdir, 'sub', 'files'))
-        
+
         for prefix in ('', 'sub'):
             with open(pjoin(nbdir, prefix, 'files', 'f1.txt'), 'w') as f:
-                f.write(prefix + '/files/f1')
+                f.write(f'{prefix}/files/f1')
             with open(pjoin(nbdir, prefix, 'files', 'f2.txt'), 'w') as f:
-                f.write(prefix + '/files/f2')
+                f.write(f'{prefix}/files/f2')
             with open(pjoin(nbdir, prefix, 'f2.txt'), 'w') as f:
-                f.write(prefix + '/f2')
+                f.write(f'{prefix}/f2')
             with open(pjoin(nbdir, prefix, 'f3.txt'), 'w') as f:
-                f.write(prefix + '/f3')
+                f.write(f'{prefix}/f3')
 
             url = url_path_join('notebooks', prefix, 'files', 'f1.txt')
             r = self.request('GET', url)
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.text, prefix + '/files/f1')
+            self.assertEqual(r.text, f'{prefix}/files/f1')
 
             url = url_path_join('notebooks', prefix, 'files', 'f2.txt')
             r = self.request('GET', url)
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.text, prefix + '/files/f2')
+            self.assertEqual(r.text, f'{prefix}/files/f2')
 
             url = url_path_join('notebooks', prefix, 'files', 'f3.txt')
             r = self.request('GET', url)
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.text, prefix + '/f3')
+            self.assertEqual(r.text, f'{prefix}/f3')

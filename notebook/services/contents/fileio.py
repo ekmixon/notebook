@@ -57,12 +57,12 @@ def path_to_intermediate(path):
 
     The .~ prefix will make Dropbox ignore the temporary file.'''
     dirname, basename = os.path.split(path)
-    return os.path.join(dirname, '.~'+basename)
+    return os.path.join(dirname, f'.~{basename}')
 
 def path_to_invalid(path):
     '''Name of invalid file after a failed atomic write and subsequent read.'''
     dirname, basename = os.path.split(path)
-    return os.path.join(dirname, basename+'.invalid')
+    return os.path.join(dirname, f'{basename}.invalid')
 
 @contextmanager
 def atomic_writing(path, text=True, encoding='utf-8', log=None, **kwargs):
@@ -226,7 +226,7 @@ class FileManagerMixin(Configurable):
                 if not os_path:
                     os_path = str_to_unicode(e.filename or 'unknown file')
                 path = to_api_path(os_path, root=self.root_dir)
-                raise HTTPError(403, u'Permission denied: %s' % path) from e
+                raise HTTPError(403, f'Permission denied: {path}') from e
             else:
                 raise
 
@@ -257,7 +257,7 @@ class FileManagerMixin(Configurable):
         root = os.path.abspath(self.root_dir)
         os_path = to_os_path(path, root)
         if not (os.path.abspath(os_path) + os.path.sep).startswith(root):
-            raise HTTPError(404, "%s is outside root contents directory" % path)
+            raise HTTPError(404, f"{path} is outside root contents directory")
         return os_path
 
     def _read_notebook(self, os_path, as_version=4):
@@ -300,7 +300,7 @@ class FileManagerMixin(Configurable):
           If not specified, try to decode as UTF-8, and fall back to base64
         """
         if not os.path.isfile(os_path):
-            raise HTTPError(400, "Cannot read non-file %s" % os_path)
+            raise HTTPError(400, f"Cannot read non-file {os_path}")
 
         with self.open(os_path, 'rb') as f:
             bcontent = f.read()
@@ -313,10 +313,9 @@ class FileManagerMixin(Configurable):
             except UnicodeError as e:
                 if format == 'text':
                     raise HTTPError(
-                        400,
-                        "%s is not UTF-8 encoded" % os_path,
-                        reason='bad format',
+                        400, f"{os_path} is not UTF-8 encoded", reason='bad format'
                     ) from e
+
         return encodebytes(bcontent).decode('ascii'), 'base64'
 
     def _save_file(self, os_path, content, format):
@@ -333,9 +332,7 @@ class FileManagerMixin(Configurable):
                 b64_bytes = content.encode('ascii')
                 bcontent = decodebytes(b64_bytes)
         except Exception as e:
-            raise HTTPError(
-                400, u'Encoding error saving %s: %s' % (os_path, e)
-            ) from e
+            raise HTTPError(400, f'Encoding error saving {os_path}: {e}') from e
 
         with self.atomic_writing(os_path, text=False) as f:
             f.write(bcontent)

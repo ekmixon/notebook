@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Setup script for Jupyter Notebook"""
 
+
 #-----------------------------------------------------------------------------
 #  Copyright (c) 2015-, Jupyter Development Team.
 #  Copyright (c) 2008-2015, IPython Development Team.
@@ -19,10 +20,10 @@ if sys.version_info < (3, 6):
     pip_message = 'This may be due to an out of date pip. Make sure you have pip >= 9.0.1.'
     try:
         import pip
-        pip_version = tuple([int(x) for x in pip.__version__.split('.')[:3]])
-        if pip_version < (9, 0, 1) :
-            pip_message = 'Your pip version is out of date, please install pip >= 9.0.1. '\
-            'pip {} detected.'.format(pip.__version__)
+        pip_version = tuple(int(x) for x in pip.__version__.split('.')[:3])
+        if pip_version < (9, 0, 1):
+            pip_message = f'Your pip version is out of date, please install pip >= 9.0.1. pip {pip.__version__} detected.'
+
         else:
             # pip is new enough - it must be something else
             pip_message = ''

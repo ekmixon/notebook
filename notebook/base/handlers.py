@@ -48,10 +48,7 @@ def json_sys_info():
     return _sys_info_cache
 
 def log():
-    if Application.initialized():
-        return Application.instance().log
-    else:
-        return app_log
+    return Application.instance().log if Application.initialized() else app_log
 
 class AuthenticatedHandler(web.RequestHandler):
     """A RequestHandler with an authenticated user."""
@@ -73,9 +70,8 @@ class AuthenticatedHandler(web.RequestHandler):
         ])
 
     def set_default_headers(self):
-        headers = {}
-        headers["X-Content-Type-Options"] = "nosniff"
-        headers.update(self.settings.get('headers', {}))
+        headers = {"X-Content-Type-Options": "nosniff"}
+        headers |= self.settings.get('headers', {})
 
         headers["Content-Security-Policy"] = self.content_security_policy
 
@@ -152,16 +148,14 @@ class AuthenticatedHandler(web.RequestHandler):
 
     @property
     def cookie_name(self):
-        default_cookie_name = non_alphanum.sub('-', 'username-{}'.format(
-            self.request.host
-        ))
+        default_cookie_name = non_alphanum.sub('-', f'username-{self.request.host}')
         return self.settings.get('cookie_name', default_cookie_name)
     
     @property
     def logged_in(self):
         """Is a user currently logged in?"""
         user = self.get_current_user()
-        return (user and not user == 'anonymous')
+        return user and user != 'anonymous'
 
     @property
     def login_handler(self):
@@ -336,15 +330,11 @@ class IPythonHandler(AuthenticatedHandler):
         )
 
     def get_origin(self):
-        # Handle WebSocket Origin naming convention differences
-        # The difference between version 8 and 13 is that in 8 the
-        # client sends a "Sec-Websocket-Origin" header and in 13 it's
-        # simply "Origin".
-        if "Origin" in self.request.headers:
-            origin = self.request.headers.get("Origin")
-        else:
-            origin = self.request.headers.get("Sec-Websocket-Origin", None)
-        return origin
+        return (
+            self.request.headers.get("Origin")
+            if "Origin" in self.request.headers
+            else self.request.headers.get("Sec-Websocket-Origin", None)
+        )
 
     # origin_to_satisfy_tornado is present because tornado requires
     # check_origin to take an origin argument, but we don't use it
@@ -424,7 +414,7 @@ class IPythonHandler(AuthenticatedHandler):
             return True
 
         # apply cross-origin checks to Referer:
-        origin = "{}://{}".format(referer_url.scheme, referer_url.netloc)
+        origin = f"{referer_url.scheme}://{referer_url.netloc}"
         if self.allow_origin:
             allow = self.allow_origin == origin
         elif self.allow_origin_pat:
@@ -448,17 +438,17 @@ class IPythonHandler(AuthenticatedHandler):
         try:
             return super().check_xsrf_cookie()
         except web.HTTPError as e:
-            if self.request.method in {'GET', 'HEAD'}:
-                # Consider Referer a sufficient cross-origin check for GET requests
-                if not self.check_referer():
-                    referer = self.request.headers.get('Referer')
-                    if referer:
-                        msg = "Blocking Cross Origin request from {}.".format(referer)
-                    else:
-                        msg = "Blocking request from unknown origin"
-                    raise web.HTTPError(403, msg) from e
-            else:
+            if self.request.method not in {'GET', 'HEAD'}:
                 raise
+                # Consider Referer a sufficient cross-origin check for GET requests
+            if not self.check_referer():
+                msg = (
+                    f"Blocking Cross Origin request from {referer}."
+                    if (referer := self.request.headers.get('Referer'))
+                    else "Blocking request from unknown origin"
+                )
+
+                raise web.HTTPError(403, msg) from e
 
     def check_host(self):
         """Check the host header if remote access disallowed.
@@ -469,7 +459,7 @@ class IPythonHandler(AuthenticatedHandler):
             return True
 
         # Remove port (e.g. ':8888') from host
-        host = re.match(r'^(.*?)(:\d+)?$', self.request.host).group(1)
+        host = re.match(r'^(.*?)(:\d+)?$', self.request.host)[1]
 
         # Browsers format IPv6 addresses like [::1]; we need to remove the []
         if host.startswith('[') and host.endswith(']'):
@@ -511,7 +501,7 @@ class IPythonHandler(AuthenticatedHandler):
         return self.settings['jinja2_env'].get_template(name)
     
     def render_template(self, name, **ns):
-        ns.update(self.template_namespace)
+        ns |= self.template_namespace
         template = self.get_template(name)
         return template.render(**ns)
     
@@ -565,12 +555,10 @@ class IPythonHandler(AuthenticatedHandler):
                 message = exception.log_message % exception.args
             except Exception:
                 pass
-            
-            # construct the custom reason, if defined
-            reason = getattr(exception, 'reason', '')
-            if reason:
+
+            if reason := getattr(exception, 'reason', ''):
                 status_message = reason
-        
+
         # build template namespace
         ns = dict(
             status_code=status_code,
@@ -582,7 +570,7 @@ class IPythonHandler(AuthenticatedHandler):
         self.set_header('Content-Type', 'text/html')
         # render the template
         try:
-            html = self.render_template('%s.html' % status_code, **ns)
+            html = self.render_template(f'{status_code}.html', **ns)
         except TemplateNotFound:
             html = self.render_template('error.html', **ns)
 
@@ -604,8 +592,7 @@ class APIHandler(IPythonHandler):
         reply = {
             'message': message,
         }
-        exc_info = kwargs.get('exc_info')
-        if exc_info:
+        if exc_info := kwargs.get('exc_info'):
             e = exc_info[1]
             if isinstance(e, HTTPError):
                 reply['message'] = e.log_message or message
@@ -635,11 +622,12 @@ class APIHandler(IPythonHandler):
 
     @property
     def content_security_policy(self):
-        csp = '; '.join([
+        return '; '.join(
+            [
                 super().content_security_policy,
                 "default-src 'none'",
-            ])
-        return csp
+            ]
+        )
 
     # set _track_activity = False on API handlers that shouldn't track activity
     _track_activity = True
@@ -704,7 +692,7 @@ class AuthenticatedFileHandler(IPythonHandler, web.StaticFileHandler):
     def content_security_policy(self):
         # In case we're serving HTML/SVG, confine any Javascript to a unique
         # origin so it can't interact with the notebook server.
-        return super().content_security_policy + "; sandbox allow-scripts"
+        return f"{super().content_security_policy}; sandbox allow-scripts"
 
     @web.authenticated
     def head(self, path):
@@ -729,12 +717,12 @@ class AuthenticatedFileHandler(IPythonHandler, web.StaticFileHandler):
             name = path
         if name.endswith('.ipynb'):
             return 'application/x-ipynb+json'
-        else:
-            cur_mime = mimetypes.guess_type(name)[0]
-            if cur_mime == 'text/plain':
-                return 'text/plain; charset=UTF-8'
-            else:
-                return super().get_content_type()
+        cur_mime = mimetypes.guess_type(name)[0]
+        return (
+            'text/plain; charset=UTF-8'
+            if cur_mime == 'text/plain'
+            else super().get_content_type()
+        )
 
     def set_headers(self):
         super().set_headers()
@@ -829,11 +817,11 @@ class FileFindHandler(IPythonHandler, web.StaticFileHandler):
             except IOError:
                 # IOError means not found
                 return ''
-            
-            cls._static_paths[path] = abspath
-            
 
-            log().debug("Path %s served from %s"%(path, abspath))
+            cls._static_paths[path] = abspath
+
+
+            log().debug(f"Path {path} served from {abspath}")
             return abspath
     
     def validate_absolute_path(self, root, absolute_path):

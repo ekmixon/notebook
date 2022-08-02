@@ -33,8 +33,7 @@ def popen_wait(p, timeout):
 
 NOTEBOOK_SHUTDOWN_TIMEOUT = 10
 
-have = {}
-have['casperjs'] = bool(which('casperjs'))
+have = {'casperjs': bool(which('casperjs'))}
 have['phantomjs'] = bool(which('phantomjs'))
 have['slimerjs'] = bool(which('slimerjs'))
 
@@ -162,7 +161,7 @@ class TestController(object):
             # really gone, ignore it.
             pass
         else:
-            for i in range(10):
+            for _ in range(10):
                 if subp.poll() is None:
                     time.sleep(0.1)
                 else:
@@ -188,7 +187,7 @@ def get_js_test_dir():
 def all_js_groups():
     import glob
     test_dir = get_js_test_dir()
-    all_subdirs = glob.glob(test_dir + '[!_]*/')
+    all_subdirs = glob.glob(f'{test_dir}[!_]*/')
     return [os.path.relpath(x, test_dir) for x in all_subdirs]
 
 class JSController(TestController):
@@ -210,7 +209,13 @@ class JSController(TestController):
         js_test_dir = get_js_test_dir()
         includes = '--includes=' + os.path.join(js_test_dir,'util.js')
         test_cases = os.path.join(js_test_dir, self.section)
-        self.cmd = ['casperjs', 'test', includes, test_cases, '--engine=%s' % self.engine]
+        self.cmd = [
+            'casperjs',
+            'test',
+            includes,
+            test_cases,
+            f'--engine={self.engine}',
+        ]
 
     def setup(self):
         self.ipydir = TemporaryDirectory()
@@ -240,7 +245,7 @@ class JSController(TestController):
                 alive = False
 
             if alive:
-                self.cmd.append("--url=%s" % self.url)
+                self.cmd.append(f"--url={self.url}")
             else:
                 raise Exception('Could not reach "%s".' % self.url)
         else:
@@ -255,7 +260,7 @@ class JSController(TestController):
 
     def add_xunit(self):
         xunit_file = os.path.abspath(self.section.replace('/','.') + '.xunit.xml')
-        self.cmd.append('--xunit=%s' % xunit_file)
+        self.cmd.append(f'--xunit={xunit_file}')
 
     def launch(self, buffer_output):
         # If the engine is SlimerJS, we need to buffer the output because
@@ -269,34 +274,31 @@ class JSController(TestController):
     def wait(self, *pargs, **kwargs):
         """Wait for the JSController to finish"""
         ret = super().wait(*pargs, **kwargs)
-        # If this is a SlimerJS controller, check the captured stdout for
-        # errors.  Otherwise, just return the return code.
-        if self.engine == 'slimerjs':
-            stdout = bytes_to_str(self.stdout)
-            if ret != 0:
-                # This could still happen e.g. if it's stopped by SIGINT
-                return ret
-            return bool(self.slimer_failure.search(stdout))
-        else:
+        if self.engine != 'slimerjs':
             return ret
+        stdout = bytes_to_str(self.stdout)
+        return ret if ret != 0 else bool(self.slimer_failure.search(stdout))
 
     def print_extra_info(self):
         print("Running tests with notebook directory %r" % self.nbdir.name)
 
     @property
     def will_run(self):
-        should_run = all(have[a] for a in self.requirements + [self.engine])
-        return should_run
+        return all(have[a] for a in self.requirements + [self.engine])
 
     def _init_server(self):
         "Start the notebook server in a separate process"
-        self.server_command = command = [sys.executable,
-            '-m', 'notebook',
+        self.server_command = command = [
+            sys.executable,
+            '-m',
+            'notebook',
             '--no-browser',
-            '--notebook-dir', self.nbdir.name,
+            '--notebook-dir',
+            self.nbdir.name,
             '--NotebookApp.token=',
-            '--NotebookApp.base_url=%s' % self.base_url,
+            f'--NotebookApp.base_url={self.base_url}',
         ]
+
         # ipc doesn't work on Windows, and darwin has crazy-long temp paths,
         # which run afoul of ipc's maximum path length.
         if sys.platform.startswith('linux'):
@@ -320,7 +322,7 @@ class JSController(TestController):
     
     def _wait_for_server(self):
         """Wait 30 seconds for the notebook server to start"""
-        for i in range(300):
+        for _ in range(300):
             if self.server.poll() is not None:
                 return self._failed_to_start()
             if os.path.exists(self.server_info_file):
@@ -333,8 +335,9 @@ class JSController(TestController):
                 else:
                     return
             time.sleep(0.1)
-        print("Notebook server-info file never arrived: %s" % self.server_info_file,
-            file=sys.stderr
+        print(
+            f"Notebook server-info file never arrived: {self.server_info_file}",
+            file=sys.stderr,
         )
     
     def _failed_to_start(self):
@@ -374,10 +377,12 @@ class JSController(TestController):
             try:
                 popen_wait(self.server, NOTEBOOK_SHUTDOWN_TIMEOUT)
             except TimeoutExpired:
-                print("Notebook server still running (%s)" % self.server_info_file,
-                    file=sys.stderr
+                print(
+                    f"Notebook server still running ({self.server_info_file})",
+                    file=sys.stderr,
                 )
-              
+
+
             self.stream_capturer.halt()
         TestController.cleanup(self)
 
@@ -503,7 +508,7 @@ def run_jstestall(options):
 
     def justify(ltext, rtext, width=70, fill='-'):
         ltext += ' '
-        rtext = (' ' + rtext).rjust(width - len(ltext), fill)
+        rtext = f' {rtext}'.rjust(width - len(ltext), fill)
         return ltext + rtext
 
     # Run all test runners, tracking execution time
@@ -530,7 +535,7 @@ def run_jstestall(options):
             pool = multiprocessing.pool.ThreadPool(options.fast)
             for (controller, res) in pool.imap_unordered(do_run, to_run):
                 res_string = 'OK' if res == 0 else 'FAILED'
-                print(justify('Test group: ' + controller.section, res_string))
+                print(justify(f'Test group: {controller.section}', res_string))
                 if res:
                     controller.print_extra_info()
                     print(bytes_to_str(controller.stdout))
@@ -542,7 +547,7 @@ def run_jstestall(options):
             return
 
     for controller in not_run:
-        print(justify('Test group: ' + controller.section, 'NOT RUN'))
+        print(justify(f'Test group: {controller.section}', 'NOT RUN'))
 
     t_end = time.time()
     t_tests = t_end - t_start

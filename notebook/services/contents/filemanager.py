@@ -132,8 +132,9 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
                 self.post_save_hook(os_path=os_path, model=model, contents_manager=self)
             except Exception as e:
                 self.log.error("Post-save hook failed o-n %s", os_path, exc_info=True)
-                raise web.HTTPError(500, u'Unexpected error while running post hook save: %s'
-                                    % e) from e
+                raise web.HTTPError(
+                    500, f'Unexpected error while running post hook save: {e}'
+                ) from e
 
     @validate('root_dir')
     def _validate_root_dir(self, proposal):
@@ -243,14 +244,14 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
         """Build the common base of a contents model"""
         os_path = self._get_os_path(path)
         info = os.lstat(os_path)
-        
+
         try:
             # size of file 
             size = info.st_size
         except (ValueError, OSError):
             self.log.warning('Unable to get size.')
             size = None
-        
+
         try:
             last_modified = tz.utcfromtimestamp(info.st_mtime)
         except (ValueError, OSError):
@@ -268,8 +269,7 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
             created = datetime(1970, 1, 1, 0, 0, tzinfo=tz.UTC)
 
         # Create the base model.
-        model = {}
-        model['name'] = path.rsplit('/', 1)[-1]
+        model = {'name': path.rsplit('/', 1)[-1]}
         model['path'] = path
         model['last_modified'] = last_modified
         model['created'] = created
@@ -333,11 +333,11 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
                     continue
 
                 try:
-                    if self.should_list(name):
-                        if self.allow_hidden or not is_file_hidden(os_path, stat_res=st):
-                            contents.append(
-                                    self.get(path='%s/%s' % (path, name), content=False)
-                            )
+                    if self.should_list(name) and (
+                        self.allow_hidden
+                        or not is_file_hidden(os_path, stat_res=st)
+                    ):
+                        contents.append(self.get(path=f'{path}/{name}', content=False))
                 except OSError as e:
                     # ELOOP: recursive symlink
                     if e.errno != errno.ELOOP:
@@ -427,22 +427,22 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
         path = path.strip('/')
 
         if not self.exists(path):
-            raise web.HTTPError(404, u'No such file or directory: %s' % path)
+            raise web.HTTPError(404, f'No such file or directory: {path}')
 
         os_path = self._get_os_path(path)
         if os.path.isdir(os_path):
             if type not in (None, 'directory'):
-                raise web.HTTPError(400,
-                                u'%s is a directory, not a %s' % (path, type), reason='bad type')
-            model = self._dir_model(path, content=content)
+                raise web.HTTPError(
+                    400, f'{path} is a directory, not a {type}', reason='bad type'
+                )
+
+            return self._dir_model(path, content=content)
         elif type == 'notebook' or (type is None and path.endswith('.ipynb')):
-            model = self._notebook_model(path, content=content)
+            return self._notebook_model(path, content=content)
         else:
             if type == 'directory':
-                raise web.HTTPError(400,
-                                u'%s is not a directory' % path, reason='bad type')
-            model = self._file_model(path, content=content, format=format)
-        return model
+                raise web.HTTPError(400, f'{path} is not a directory', reason='bad type')
+            return self._file_model(path, content=content, format=format)
 
     def _save_directory(self, os_path, model, path=''):
         """create a directory"""
@@ -452,7 +452,7 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
             with self.perm_to_403():
                 os.mkdir(os_path)
         elif not os.path.isdir(os_path):
-            raise web.HTTPError(400, u'Not a directory: %s' % (os_path))
+            raise web.HTTPError(400, f'Not a directory: {os_path}')
         else:
             self.log.debug("Directory %r already exists", os_path)
 
@@ -484,13 +484,15 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
             elif model['type'] == 'directory':
                 self._save_directory(os_path, model, path)
             else:
-                raise web.HTTPError(400, "Unhandled contents type: %s" % model['type'])
+                raise web.HTTPError(400, f"Unhandled contents type: {model['type']}")
         except web.HTTPError:
             raise
         except Exception as e:
             self.log.error(u'Error while saving file: %s %s', path, e, exc_info=True)
-            raise web.HTTPError(500, u'Unexpected error while saving file: %s %s' %
-                                (path, e)) from e
+            raise web.HTTPError(
+                500, f'Unexpected error while saving file: {path} {e}'
+            ) from e
+
 
         validation_message = None
         if model['type'] == 'notebook':
@@ -511,7 +513,7 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
         os_path = self._get_os_path(path)
         rm = os.unlink
         if not os.path.exists(os_path):
-            raise web.HTTPError(404, u'File or directory does not exist: %s' % os_path)
+            raise web.HTTPError(404, f'File or directory does not exist: {os_path}')
 
         def is_non_empty_dir(os_path):
             if os.path.isdir(os_path):
@@ -527,7 +529,7 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
             if sys.platform == 'win32' and is_non_empty_dir(os_path):
                 # send2trash can really delete files on Windows, so disallow
                 # deleting non-empty files. See Github issue 3631.
-                raise web.HTTPError(400, u'Directory %s not empty' % os_path)
+                raise web.HTTPError(400, f'Directory {os_path} not empty')
             try:
                 self.log.debug("Sending %s to trash", os_path)
                 send2trash(os_path)
@@ -538,7 +540,7 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
         if os.path.isdir(os_path):
             # Don't permanently delete non-empty directories.
             if is_non_empty_dir(os_path):
-                raise web.HTTPError(400, u'Directory %s not empty' % os_path)
+                raise web.HTTPError(400, f'Directory {os_path} not empty')
             self.log.debug("Removing directory %s", os_path)
             with self.perm_to_403():
                 shutil.rmtree(os_path)
@@ -563,7 +565,7 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
 
         # Should we proceed with the move?
         if os.path.exists(new_os_path) and not samefile(old_os_path, new_os_path):
-            raise web.HTTPError(409, u'File already exists: %s' % new_path)
+            raise web.HTTPError(409, f'File already exists: {new_path}')
 
         # Move the file
         try:
@@ -572,8 +574,7 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
         except web.HTTPError:
             raise
         except Exception as e:
-            raise web.HTTPError(500, u'Unknown error renaming file: %s %s' %
-                                (old_path, e)) from e
+            raise web.HTTPError(500, f'Unknown error renaming file: {old_path} {e}') from e
 
     def info_string(self):
         return _("Serving notebooks from local directory: %s") % self.root_dir
@@ -582,28 +583,16 @@ class FileContentsManager(FileManagerMixin, ContentsManager):
         """Return the initial API path of  a kernel associated with a given notebook"""
         if self.dir_exists(path):
             return path
-        if '/' in path:
-            parent_dir = path.rsplit('/', 1)[0]
-        else:
-            parent_dir = ''
-        return parent_dir
+        return path.rsplit('/', 1)[0] if '/' in path else ''
 
     @staticmethod
     def _validate_path(path):
         """Checks if the path contains invalid characters relative to the current platform"""
 
-        if sys.platform == 'win32':
-            # On Windows systems, we MUST disallow colons otherwise an Alternative Data Stream will
-            # be created and confusion will reign! (See https://github.com/jupyter/notebook/issues/5190)
-            # Go ahead and add other invalid (and non-path-separator) characters here as well so there's
-            # consistent behavior - although all others will result in '[Errno 22]Invalid Argument' errors.
-            invalid_chars = '?:><*"|'
-        else:
-            # On non-windows systems, allow the underlying file creation to perform enforcement when appropriate
-            invalid_chars = ''
-
+        invalid_chars = '?:><*"|' if sys.platform == 'win32' else ''
         for char in invalid_chars:
             if char in path:
-                raise web.HTTPError(400, "Path '{}' contains characters that are invalid for the filesystem. "
-                                         "Path names on this filesystem cannot contain any of the following "
-                                         "characters: {}".format(path, invalid_chars))
+                raise web.HTTPError(
+                    400,
+                    f"Path '{path}' contains characters that are invalid for the filesystem. Path names on this filesystem cannot contain any of the following characters: {invalid_chars}",
+                )

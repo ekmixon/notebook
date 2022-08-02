@@ -107,26 +107,20 @@ class TestInstallNBExtension(TestCase):
     def assert_dir_exists(self, path):
         if not os.path.exists(path):
             do_exist = os.listdir(os.path.dirname(path))
-            self.fail(u"%s should exist (found %s)" % (path, do_exist))
+            self.fail(f"{path} should exist (found {do_exist})")
 
     def assert_not_dir_exists(self, path):
         if os.path.exists(path):
-            self.fail(u"%s should not exist" % path)
+            self.fail(f"{path} should not exist")
 
     def assert_installed(self, relative_path, user=False):
-        if user:
-            nbext = pjoin(self.data_dir, u'nbextensions')
-        else:
-            nbext = self.system_nbext
+        nbext = pjoin(self.data_dir, u'nbextensions') if user else self.system_nbext
         self.assert_dir_exists(
             pjoin(nbext, relative_path)
         )
 
     def assert_not_installed(self, relative_path, user=False):
-        if user:
-            nbext = pjoin(self.data_dir, u'nbextensions')
-        else:
-            nbext = self.system_nbext
+        nbext = pjoin(self.data_dir, u'nbextensions') if user else self.system_nbext
         self.assert_not_dir_exists(
             pjoin(nbext, relative_path)
         )
@@ -285,7 +279,7 @@ class TestInstallNBExtension(TestCase):
             f.addfile(info, BytesIO(buf))
 
         for i,ext in enumerate((".tar.gz", ".tgz", ".tar.bz2")):
-            path = pjoin(self.src, "myjsext" + ext)
+            path = pjoin(self.src, f"myjsext{ext}")
             with tarfile.open(path, 'w') as f:
                 _add_file(f, "b%i.js" % i, b"b();")
                 _add_file(f, "foo/b%i.js" % i, b"foo();")

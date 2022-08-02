@@ -13,16 +13,16 @@ class EditorHandler(IPythonHandler):
     def get(self, path):
         path = path.strip('/')
         if not self.contents_manager.file_exists(path):
-            raise web.HTTPError(404, u'File does not exist: %s' % path)
+            raise web.HTTPError(404, f'File does not exist: {path}')
 
         basename = path.rsplit('/', 1)[-1]
-        self.write(self.render_template('edit.html',
-            file_path=url_escape(path),
-            basename=basename,
-            page_title=basename + " (editing)",
+        self.write(
+            self.render_template(
+                'edit.html',
+                file_path=url_escape(path),
+                basename=basename,
+                page_title=f"{basename} (editing)",
             )
         )
 
-default_handlers = [
-    (r"/edit%s" % path_regex, EditorHandler),
-]
+default_handlers = [(f"/edit{path_regex}", EditorHandler)]

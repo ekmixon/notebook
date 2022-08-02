@@ -42,13 +42,13 @@ class LoginHandler(IPythonHandler):
         # instead of %5C, causing `\\` to behave as `//`
         url = url.replace("\\", "%5C")
         parsed = urlparse(url)
-        if parsed.netloc or not (parsed.path + '/').startswith(self.base_url):
+        if parsed.netloc or not f'{parsed.path}/'.startswith(self.base_url):
             # require that next_url be absolute path within our path
             allow = False
             # OR pass our cross-origin check
             if parsed.netloc:
                 # if full URL, run our cross-origin check:
-                origin = '%s://%s' % (parsed.scheme, parsed.netloc)
+                origin = f'{parsed.scheme}://{parsed.netloc}'
                 origin = origin.lower()
                 if self.allow_origin:
                     allow = self.allow_origin == origin
@@ -79,7 +79,7 @@ class LoginHandler(IPythonHandler):
         new_password = self.get_argument('new_password', default=u'')
 
 
-        
+
         if self.get_login_available(self.settings):
             if self.passwd_check(self.hashed_password, typed_password) and not new_password:
                 self.set_login_cookie(self, uuid.uuid4().hex)
@@ -89,7 +89,7 @@ class LoginHandler(IPythonHandler):
                     config_dir = self.settings.get('config_dir')
                     config_file = os.path.join(config_dir, 'jupyter_notebook_config.json')
                     set_password(new_password, config_file=config_file)
-                    self.log.info("Wrote hashed password to %s" % config_file)
+                    self.log.info(f"Wrote hashed password to {config_file}")
             else:
                 self.set_status(401)
                 self._render(message={'error': 'Invalid credentials'})
@@ -126,9 +126,9 @@ class LoginHandler(IPythonHandler):
 
         user_token = handler.get_argument('token', '')
         if not user_token:
-            # get it from Authorization header
-            m = cls.auth_header_pat.match(handler.request.headers.get('Authorization', ''))
-            if m:
+            if m := cls.auth_header_pat.match(
+                handler.request.headers.get('Authorization', '')
+            ):
                 user_token = m.group(1)
         return user_token
 
@@ -213,10 +213,7 @@ class LoginHandler(IPythonHandler):
             handler.log.debug("Accepting token-authenticated connection from %s", handler.request.remote_ip)
             authenticated = True
 
-        if authenticated:
-            return uuid.uuid4().hex
-        else:
-            return None
+        return uuid.uuid4().hex if authenticated else None
 
 
     @classmethod
@@ -233,11 +230,10 @@ class LoginHandler(IPythonHandler):
             if not app.password and not app.token:
                 app.log.warning(warning + " and not using authentication. "
                     "This is highly insecure and not recommended.")
-        else:
-            if not app.password and not app.token:
-                app.log.warning(
-                    "All authentication is disabled."
-                    "  Anyone who can connect to this server will be able to run code.")
+        elif not app.password and not app.token:
+            app.log.warning(
+                "All authentication is disabled."
+                "  Anyone who can connect to this server will be able to run code.")
 
     @classmethod
     def password_from_settings(cls, settings):

@@ -49,8 +49,10 @@ def url_path_join(*pieces):
     final = pieces[-1].endswith('/')
     stripped = [s.strip('/') for s in pieces]
     result = '/'.join(s for s in stripped if s)
-    if initial: result = '/' + result
-    if final: result = result + '/'
+    if initial:
+        result = f'/{result}'
+    if final:
+        result += '/'
     if result == '//': result = '/'
     return result
 
@@ -64,8 +66,7 @@ def path2url(path):
     # preserve trailing /
     if pieces[-1] == '':
         pieces[-1] = '/'
-    url = url_path_join(*pieces)
-    return url
+    return url_path_join(*pieces)
 
 def url2path(url):
     """Convert a URL to a local file path"""
@@ -152,16 +153,13 @@ def is_file_hidden_posix(abs_path, stat_res=None):
             raise
 
     # check that dirs can be listed
-    if stat.S_ISDIR(stat_res.st_mode):
-        # use x-access, not actual listing, in case of slow/large listings
-        if not os.access(abs_path, os.X_OK | os.R_OK):
-            return True
-
-    # check UF_HIDDEN
-    if getattr(stat_res, 'st_flags', 0) & UF_HIDDEN:
+    if stat.S_ISDIR(stat_res.st_mode) and not os.access(
+        abs_path, os.X_OK | os.R_OK
+    ):
         return True
 
-    return False
+    # check UF_HIDDEN
+    return bool(getattr(stat_res, 'st_flags', 0) & UF_HIDDEN)
 
 if sys.platform == 'win32':
     is_file_hidden = is_file_hidden_win
@@ -306,10 +304,7 @@ def _check_pid_posix(pid):
     else:
         return True
 
-if sys.platform == 'win32':
-    check_pid = _check_pid_win32
-else:
-    check_pid = _check_pid_posix
+check_pid = _check_pid_win32 if sys.platform == 'win32' else _check_pid_posix
 
 
 def maybe_future(obj):
@@ -382,7 +377,7 @@ def urldecode_unix_socket_path(socket_path):
 
 def urlencode_unix_socket(socket_path):
     """Encodes a UNIX socket URL from a socket path for the `http+unix` URI form."""
-    return 'http+unix://%s' % urlencode_unix_socket_path(socket_path)
+    return f'http+unix://{urlencode_unix_socket_path(socket_path)}'
 
 
 def unix_socket_in_use(socket_path):

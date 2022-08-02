@@ -18,8 +18,7 @@ from .launchnotebook import NotebookTestBase
 def generate_kernelspec(name):
     argv_stanza = ['python', '-m', 'ipykernel_launcher', '-f', '{connection_file}']
     spec_stanza = {'spec': {'argv': argv_stanza, 'env': {}, 'display_name': name, 'language': 'python', 'interrupt_mode': 'signal', 'metadata': {}}}
-    kernelspec_stanza = {'name': name, 'spec': spec_stanza, 'resources': {}}
-    return kernelspec_stanza
+    return {'name': name, 'spec': spec_stanza, 'resources': {}}
 
 
 # We'll mock up two kernelspecs - kspec_foo and kspec_bar
@@ -27,22 +26,24 @@ kernelspecs = {'default': 'kspec_foo', 'kernelspecs': {'kspec_foo': generate_ker
 
 
 # maintain a dictionary of expected running kernels.  Key = kernel_id, Value = model.
-running_kernels = dict()
+running_kernels = {}
 
 
 def generate_model(name):
     """Generate a mocked kernel model.  Caller is responsible for adding model to running_kernels dictionary."""
-    dt = datetime.utcnow().isoformat() + 'Z'
+    dt = f'{datetime.utcnow().isoformat()}Z'
     kernel_id = str(uuid.uuid4())
-    model = {'id': kernel_id, 'name': name, 'last_activity': str(dt), 'execution_state': 'idle', 'connections': 1}
-    return model
+    return {
+        'id': kernel_id,
+        'name': name,
+        'last_activity': str(dt),
+        'execution_state': 'idle',
+        'connections': 1,
+    }
 
 
 async def mock_gateway_request(url, **kwargs):
-    method = 'GET'
-    if kwargs['method']:
-        method = kwargs['method']
-
+    method = kwargs['method'] or 'GET'
     request = HTTPRequest(url=url, **kwargs)
 
     endpoint = str(url)
@@ -57,13 +58,16 @@ async def mock_gateway_request(url, **kwargs):
     if endpoint.rfind('/api/kernelspecs/') >= 0 and method == 'GET':
         requested_kernelspec = endpoint.rpartition('/')[2]
         kspecs = kernelspecs.get('kernelspecs')
-        if requested_kernelspec in kspecs:
-            response_buf = StringIO(json.dumps(kspecs.get(requested_kernelspec)))
-            response = await maybe_future(HTTPResponse(request, 200, buffer=response_buf))
-            return response
-        else:
-            raise HTTPError(404, message='Kernelspec does not exist: %s' % requested_kernelspec)
+        if requested_kernelspec not in kspecs:
+            raise HTTPError(
+                404,
+                message=f'Kernelspec does not exist: {requested_kernelspec}',
+            )
 
+
+        response_buf = StringIO(json.dumps(kspecs.get(requested_kernelspec)))
+        response = await maybe_future(HTTPResponse(request, 200, buffer=response_buf))
+        return response
     # Create kernel
     if endpoint.endswith('/api/kernels') and method == 'POST':
         json_body = json.loads(kwargs['body'])
@@ -91,21 +95,21 @@ async def mock_gateway_request(url, **kwargs):
     if endpoint.rfind('/api/kernels/') >= 0 and method == 'POST':
         requested_kernel_id, sep, action = endpoint.rpartition('/api/kernels/')[2].rpartition('/')
 
-        if action == 'interrupt':
-            if requested_kernel_id in running_kernels:
-                response = await maybe_future(HTTPResponse(request, 204))
-                return response
-            else:
-                raise HTTPError(404, message='Kernel does not exist: %s' % requested_kernel_id)
+        if action == 'interrupt' and requested_kernel_id in running_kernels:
+            response = await maybe_future(HTTPResponse(request, 204))
+            return response
+        elif (
+            action == 'interrupt'
+            or action == 'restart'
+            and requested_kernel_id not in running_kernels
+        ):
+            raise HTTPError(404, message=f'Kernel does not exist: {requested_kernel_id}')
         elif action == 'restart':
-            if requested_kernel_id in running_kernels:
-                response_buf = StringIO(json.dumps(running_kernels.get(requested_kernel_id)))
-                response = await maybe_future(HTTPResponse(request, 204, buffer=response_buf))
-                return response
-            else:
-                raise HTTPError(404, message='Kernel does not exist: %s' % requested_kernel_id)
+            response_buf = StringIO(json.dumps(running_kernels.get(requested_kernel_id)))
+            response = await maybe_future(HTTPResponse(request, 204, buffer=response_buf))
+            return response
         else:
-            raise HTTPError(404, message='Bad action detected: %s' % action)
+            raise HTTPError(404, message=f'Bad action detected: {action}')
 
     # Shutdown existing kernel
     if endpoint.rfind('/api/kernels/') >= 0 and method == 'DELETE':
@@ -117,12 +121,11 @@ async def mock_gateway_request(url, **kwargs):
     # Fetch existing kernel
     if endpoint.rfind('/api/kernels/') >= 0 and method == 'GET':
         requested_kernel_id = endpoint.rpartition('/')[2]
-        if requested_kernel_id in running_kernels:
-            response_buf = StringIO(json.dumps(running_kernels.get(requested_kernel_id)))
-            response = await maybe_future(HTTPResponse(request, 200, buffer=response_buf))
-            return response
-        else:
-            raise HTTPError(404, message='Kernel does not exist: %s' % requested_kernel_id)
+        if requested_kernel_id not in running_kernels:
+            raise HTTPError(404, message=f'Kernel does not exist: {requested_kernel_id}')
+        response_buf = StringIO(json.dumps(running_kernels.get(requested_kernel_id)))
+        response = await maybe_future(HTTPResponse(request, 200, buffer=response_buf))
+        return response
 
 
 mocked_gateway = patch('notebook.gateway.managers.gateway_request', mock_gateway_request)
@@ -153,11 +156,17 @@ class TestGateway(NotebookTestBase):
     @classmethod
     def get_argv(cls):
         argv = super(TestGateway, cls).get_argv()
-        argv.extend(['--GatewayClient.request_timeout=96.0', '--GatewayClient.http_user=' + TestGateway.mock_http_user])
+        argv.extend(
+            [
+                '--GatewayClient.request_timeout=96.0',
+                f'--GatewayClient.http_user={TestGateway.mock_http_user}',
+            ]
+        )
+
         return argv
 
     def setUp(self):
-        kwargs = dict()
+        kwargs = {}
         GatewayClient.instance().load_connection_args(**kwargs)
         super().setUp()
 
@@ -253,8 +262,13 @@ class TestGateway(NotebookTestBase):
         """
         with mocked_gateway:
             nb_path = os.path.join(self.notebook_dir, 'testgw.ipynb')
-            kwargs = dict()
-            kwargs['json'] = {'path': nb_path, 'type': 'notebook', 'kernel': {'name': kernel_name}}
+            kwargs = {
+                'json': {
+                    'path': nb_path,
+                    'type': 'notebook',
+                    'kernel': {'name': kernel_name},
+                }
+            }
 
             # add a KERNEL_ value to the current env and we'll ensure that that value exists in the mocked method
             os.environ['KERNEL_KSPEC_NAME'] = kernel_name
@@ -280,7 +294,7 @@ class TestGateway(NotebookTestBase):
         """
         with mocked_gateway:
             # Delete the session (and kernel)
-            response = self.request('DELETE', '/api/sessions/' + session_id)
+            response = self.request('DELETE', f'/api/sessions/{session_id}')
             self.assertEqual(response.status_code, 204)
             self.assertEqual(response.reason, 'No Content')
 
@@ -293,18 +307,13 @@ class TestGateway(NotebookTestBase):
             self.assertEqual(response.status_code, 200)
             kernels = json.loads(response.content.decode('utf-8'))
             self.assertEqual(len(kernels), len(running_kernels))
-            for model in kernels:
-                if model.get('id') == kernel_id:
-                    return True
-            return False
+            return any(model.get('id') == kernel_id for model in kernels)
 
     def create_kernel(self, kernel_name):
         """Issues request to restart the given kernel
         """
         with mocked_gateway:
-            kwargs = dict()
-            kwargs['json'] = {'name': kernel_name}
-
+            kwargs = {'json': {'name': kernel_name}}
             # add a KERNEL_ value to the current env and we'll ensure that that value exists in the mocked method
             os.environ['KERNEL_KSPEC_NAME'] = kernel_name
 
@@ -325,7 +334,7 @@ class TestGateway(NotebookTestBase):
         """Issues request to interrupt the given kernel
         """
         with mocked_gateway:
-            response = self.request('POST', '/api/kernels/' + kernel_id + '/interrupt')
+            response = self.request('POST', f'/api/kernels/{kernel_id}/interrupt')
             self.assertEqual(response.status_code, 204)
             self.assertEqual(response.reason, 'No Content')
 
@@ -333,7 +342,7 @@ class TestGateway(NotebookTestBase):
         """Issues request to restart the given kernel
         """
         with mocked_gateway:
-            response = self.request('POST', '/api/kernels/' + kernel_id + '/restart')
+            response = self.request('POST', f'/api/kernels/{kernel_id}/restart')
             self.assertEqual(response.status_code, 200)
             model = json.loads(response.content.decode('utf-8'))
             restarted_kernel_id = model.get('id')
@@ -347,6 +356,6 @@ class TestGateway(NotebookTestBase):
         """
         with mocked_gateway:
             # Delete the session (and kernel)
-            response = self.request('DELETE', '/api/kernels/' + kernel_id)
+            response = self.request('DELETE', f'/api/kernels/{kernel_id}')
             self.assertEqual(response.status_code, 204)
             self.assertEqual(response.reason, 'No Content')

@@ -63,7 +63,7 @@ class MockEnvTestCase(TestCase):
         self.system_config_dir = os.path.join(self.test_dir, 'system_config')
         self.system_path = [self.system_data_dir]
         self.system_config_path = [self.system_config_dir]
-        
+
         self.patches = []
         p = patch.dict('os.environ', {
             'JUPYTER_CONFIG_DIR': self.config_dir,

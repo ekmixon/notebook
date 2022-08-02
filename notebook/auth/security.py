@@ -71,7 +71,7 @@ def passwd(passphrase=None, algorithm='argon2'):
         return ':'.join((algorithm, cast_unicode(h, 'ascii')))
     else:
         h = hashlib.new(algorithm)
-        salt = ('%0' + str(salt_len) + 'x') % random.getrandbits(4 * salt_len)
+        salt = f'%0{str(salt_len)}x' % random.getrandbits(4 * salt_len)
         h.update(cast_bytes(passphrase, 'utf-8') + str_to_bytes(salt, 'ascii'))
 
         return ':'.join((algorithm, salt, h.hexdigest()))

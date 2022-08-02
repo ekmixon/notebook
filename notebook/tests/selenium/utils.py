@@ -54,15 +54,16 @@ def _wait_for(driver, locator_type, locator, timeout=10, visible=False, single=F
     if obscures:
         conditional = EC.invisibility_of_element_located
     elif single:
-        if visible:
-            conditional = EC.visibility_of_element_located
-        else:
-            conditional = EC.presence_of_element_located
+        conditional = (
+            EC.visibility_of_element_located
+            if visible
+            else EC.presence_of_element_located
+        )
+
+    elif visible:
+        conditional = EC.visibility_of_all_elements_located
     else:
-        if visible:
-            conditional = EC.visibility_of_all_elements_located
-        else:
-            conditional = EC.presence_of_all_elements_located
+        conditional = EC.presence_of_all_elements_located
     return wait.until(conditional((locator_type, locator)))
 
 
@@ -84,9 +85,7 @@ def _wait_for_multiple(driver, locator_type, locator, timeout, wait_for_n, visib
         elements = driver.find_elements(locator_type, locator)
         if visible:
             elements = [e for e in elements if e.is_displayed()]
-        if len(elements) < wait_for_n:
-            return False
-        return elements
+        return False if len(elements) < wait_for_n else elements
 
     return wait.until(multiple_found)
 
@@ -122,7 +121,7 @@ class Notebook:
         #         self.edit_cell(index=k, content=v, render=False)
 
     def __iter__(self):
-        return (cell for cell in self.cells)
+        return iter(self.cells)
 
     def _wait_for_start(self):
         """Wait until the notebook interface is loaded and the kernel started"""
@@ -175,7 +174,7 @@ class Notebook:
     def select_cell_range(self, initial_index=0, final_index=0):
         self.focus_cell(initial_index)
         self.to_command_mode()
-        for i in range(final_index - initial_index):
+        for _ in range(final_index - initial_index):
             shift(self.browser, 'j')
 
     def find_and_replace(self, index=0, find_txt='', replace_txt=''):
@@ -199,9 +198,11 @@ class Notebook:
         elif cell_type == "code":
             self.current_cell.send_keys("y")
         else:
-            raise CellTypeError(("{} is not a valid cell type,"
-                                 "use 'code', 'markdown', or 'raw'").format(cell_type))
-                                 
+            raise CellTypeError(
+                f"{cell_type} is not a valid cell type,use 'code', 'markdown', or 'raw'"
+            )
+
+
         self.wait_for_stale_cell(cell)
         self.focus_cell(index)
         return self.current_cell
@@ -234,15 +235,15 @@ class Notebook:
         )
 
     def set_cell_metadata(self, index, key, value):
-        JS = 'Jupyter.notebook.get_cell({}).metadata.{} = {}'.format(index, key, value)
+        JS = f'Jupyter.notebook.get_cell({index}).metadata.{key} = {value}'
         return self.browser.execute_script(JS)
 
     def get_cell_type(self, index=0):
-        JS = 'return Jupyter.notebook.get_cell({}).cell_type'.format(index)
+        JS = f'return Jupyter.notebook.get_cell({index}).cell_type'
         return self.browser.execute_script(JS)
         
     def set_cell_input_prompt(self, index, prmpt_val):
-        JS = 'Jupyter.notebook.get_cell({}).set_input_prompt({})'.format(index, prmpt_val)
+        JS = f'Jupyter.notebook.get_cell({index}).set_input_prompt({prmpt_val})'
         self.browser.execute_script(JS)
 
     def edit_cell(self, cell=None, index=0, content="", render=False):
@@ -297,7 +298,7 @@ class Notebook:
         self.edit_cell(index=index, content=content, render=render)
     
     def append(self, *values, cell_type="code"):
-        for i, value in enumerate(values):
+        for value in values:
             if isinstance(value, str):
                 self.add_cell(cell_type=cell_type,
                               content=value)
@@ -320,7 +321,7 @@ class Notebook:
         )
 
     def clear_cell_output(self, index):
-        JS = 'Jupyter.notebook.clear_output({})'.format(index)
+        JS = f'Jupyter.notebook.clear_output({index})'
         self.browser.execute_script(JS)
 
     @classmethod
@@ -336,7 +337,7 @@ def select_kernel(browser, kernel_name='kernel-python3'):
     wait = WebDriverWait(browser, 10)
     new_button = wait.until(EC.element_to_be_clickable((By.ID, "new-dropdown-button")))
     new_button.click()
-    kernel_selector = '#{} a'.format(kernel_name)
+    kernel_selector = f'#{kernel_name} a'
     kernel = wait_for_selector(browser, kernel_selector, single=True)
     kernel.click()
 
@@ -361,23 +362,28 @@ def new_window(browser):
     """
     initial_window_handles = browser.window_handles
     yield
-    new_window_handles = [window for window in browser.window_handles
-                          if window not in initial_window_handles]
-    if not new_window_handles:
+    if new_window_handles := [
+        window
+        for window in browser.window_handles
+        if window not in initial_window_handles
+    ]:
+        browser.switch_to.window(new_window_handles[0])
+    else:
         raise Exception("No new windows opened during context")
-    browser.switch_to.window(new_window_handles[0])
 
 def shift(browser, k):
     """Send key combination Shift+(k)"""
-    trigger_keystrokes(browser, "shift-%s"%k)
+    trigger_keystrokes(browser, f"shift-{k}")
 
 def cmdtrl(browser, k):
     """Send key combination Ctrl+(k) or Command+(k) for MacOS"""
-    trigger_keystrokes(browser, "command-%s"%k) if os.uname()[0] == "Darwin" else trigger_keystrokes(browser, "control-%s"%k)
+    trigger_keystrokes(browser, f"command-{k}") if os.uname()[
+        0
+    ] == "Darwin" else trigger_keystrokes(browser, f"control-{k}")
 
 def alt(browser, k):
     """Send key combination Alt+(k)"""
-    trigger_keystrokes(browser, 'alt-%s'%k)
+    trigger_keystrokes(browser, f'alt-{k}')
 
 def trigger_keystrokes(browser, *keys):
     """ Send the keys in sequence to the browser.
@@ -436,9 +442,10 @@ def validate_dualmode_state(notebook, mode, index):
 
         JS = "return $('#notebook .CodeMirror-focused textarea')[0];"
         focused_cell = notebook.browser.execute_script(JS)
-        JS = "return IPython.notebook.get_cell(%s).code_mirror.getInputField()"%index
+        JS = f"return IPython.notebook.get_cell({index}).code_mirror.getInputField()"
         cell = notebook.browser.execute_script(JS)
         return focused_cell == cell
+
 
 
     #general test
@@ -452,7 +459,7 @@ def validate_dualmode_state(notebook, mode, index):
     cell_index = notebook.browser.execute_script(JS)
     assert cell_index == [index] #only the index cell is selected
 
-    if mode != 'command' and mode != 'edit':
+    if mode not in ['command', 'edit']:
         raise Exception('An unknown mode was send: mode = "%s"'%mode) #An unknown mode is send
 
     #validate mode
@@ -462,7 +469,7 @@ def validate_dualmode_state(notebook, mode, index):
         assert is_focused_on(None) #no focused cells
 
         assert is_only_cell_edit(None) #no cells in edit mode
-    
+
     elif mode == 'edit':
         assert is_focused_on(index) #The specified cell is focused
 

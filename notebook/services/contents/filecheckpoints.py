@@ -95,16 +95,17 @@ class FileCheckpoints(FileManagerMixin, Checkpoints):
         path = path.strip('/')
         checkpoint_id = "checkpoint"
         os_path = self.checkpoint_path(checkpoint_id, path)
-        if not os.path.isfile(os_path):
-            return []
-        else:
-            return [self.checkpoint_model(checkpoint_id, os_path)]
+        return (
+            [self.checkpoint_model(checkpoint_id, os_path)]
+            if os.path.isfile(os_path)
+            else []
+        )
 
     # Checkpoint-related utilities
     def checkpoint_path(self, checkpoint_id, path):
         """find the path to a checkpoint"""
         path = path.strip('/')
-        parent, name = ('/' + path).rsplit('/', 1)
+        parent, name = f'/{path}'.rsplit('/', 1)
         parent = parent.strip('/')
         basename, ext = os.path.splitext(name)
         filename = u"{name}-{checkpoint_id}{ext}".format(
@@ -116,25 +117,20 @@ class FileCheckpoints(FileManagerMixin, Checkpoints):
         cp_dir = os.path.join(os_path, self.checkpoint_dir)
         with self.perm_to_403():
             ensure_dir_exists(cp_dir)
-        cp_path = os.path.join(cp_dir, filename)
-        return cp_path
+        return os.path.join(cp_dir, filename)
 
     def checkpoint_model(self, checkpoint_id, os_path):
         """construct the info dict for a given checkpoint"""
         stats = os.stat(os_path)
         last_modified = tz.utcfromtimestamp(stats.st_mtime)
-        info = dict(
+        return dict(
             id=checkpoint_id,
             last_modified=last_modified,
         )
-        return info
 
     # Error Handling
     def no_such_checkpoint(self, path, checkpoint_id):
-        raise HTTPError(
-            404,
-            u'Checkpoint does not exist: %s@%s' % (path, checkpoint_id)
-        )
+        raise HTTPError(404, f'Checkpoint does not exist: {path}@{checkpoint_id}')
 
 
 class GenericFileCheckpoints(GenericCheckpointsMixin, FileCheckpoints):

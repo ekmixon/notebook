@@ -100,11 +100,14 @@ class KernelAPITest(NotebookTestBase):
         self.assertIsInstance(kern1, dict)
 
         report_uri = url_path_join(self.url_prefix, 'api/security/csp-report')
-        expected_csp = '; '.join([
-            "frame-ancestors 'self'",
-            'report-uri ' + report_uri,
-            "default-src 'none'"
-        ])
+        expected_csp = '; '.join(
+            [
+                "frame-ancestors 'self'",
+                f'report-uri {report_uri}',
+                "default-src 'none'",
+            ]
+        )
+
         self.assertEqual(r.headers['Content-Security-Policy'], expected_csp)
 
     def test_main_kernel_handler(self):
@@ -116,11 +119,14 @@ class KernelAPITest(NotebookTestBase):
         self.assertIsInstance(kern1, dict)
 
         report_uri = url_path_join(self.url_prefix, 'api/security/csp-report')
-        expected_csp = '; '.join([
-            "frame-ancestors 'self'",
-            'report-uri ' + report_uri,
-            "default-src 'none'"
-        ])
+        expected_csp = '; '.join(
+            [
+                "frame-ancestors 'self'",
+                f'report-uri {report_uri}',
+                "default-src 'none'",
+            ]
+        )
+
         self.assertEqual(r.headers['Content-Security-Policy'], expected_csp)
 
         # GET request
@@ -163,7 +169,7 @@ class KernelAPITest(NotebookTestBase):
         # Request a bad kernel id and check that a JSON
         # message is returned!
         bad_id = '111-111-111-111-111'
-        with assert_http_error(404, 'Kernel does not exist: ' + bad_id):
+        with assert_http_error(404, f'Kernel does not exist: {bad_id}'):
             self.kern_api.get(bad_id)
 
         # DELETE kernel with id
@@ -174,7 +180,7 @@ class KernelAPITest(NotebookTestBase):
 
         # Request to delete a non-existent kernel id
         bad_id = '111-111-111-111-111'
-        with assert_http_error(404, 'Kernel does not exist: ' + bad_id):
+        with assert_http_error(404, f'Kernel does not exist: {bad_id}'):
             self.kern_api.shutdown(bad_id)
 
     def test_connections(self):
@@ -187,7 +193,7 @@ class KernelAPITest(NotebookTestBase):
         self.assertEqual(model['connections'], 1)
         ws.close()
         # give it some time to close on the other side:
-        for i in range(10):
+        for _ in range(10):
             model = self.kern_api.get(kid).json()
             if model['connections'] > 0:
                 time.sleep(0.1)
@@ -247,9 +253,14 @@ class KernelCullingTest(NotebookTestBase):
         argv = super(KernelCullingTest, cls).get_argv()
 
         # Enable culling with 5s timeout and 1s intervals
-        argv.extend(['--MappingKernelManager.cull_idle_timeout={}'.format(CULL_TIMEOUT),
-                     '--MappingKernelManager.cull_interval={}'.format(CULL_INTERVAL),
-                     '--MappingKernelManager.cull_connected=False'])
+        argv.extend(
+            [
+                f'--MappingKernelManager.cull_idle_timeout={CULL_TIMEOUT}',
+                f'--MappingKernelManager.cull_interval={CULL_INTERVAL}',
+                '--MappingKernelManager.cull_connected=False',
+            ]
+        )
+
         return argv
 
     def setUp(self):

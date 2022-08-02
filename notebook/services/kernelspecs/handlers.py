@@ -59,8 +59,7 @@ class MainKernelSpecHandler(APIHandler):
     def get(self):
         ksm = self.kernel_spec_manager
         km = self.kernel_manager
-        model = {}
-        model['default'] = km.default_kernel_name
+        model = {'default': km.default_kernel_name}
         model['kernelspecs'] = specs = {}
         kspecs = yield maybe_future(ksm.get_all_specs())
         for kernel_name, kernel_info in kspecs.items():
@@ -87,7 +86,7 @@ class KernelSpecHandler(APIHandler):
         try:
             spec = yield maybe_future(ksm.get_kernel_spec(kernel_name))
         except KeyError as e:
-            raise web.HTTPError(404, u'Kernel spec %s not found' % kernel_name) from e
+            raise web.HTTPError(404, f'Kernel spec {kernel_name} not found') from e
         if is_kernelspec_model(spec):
             model = spec
         else:
@@ -102,5 +101,5 @@ kernel_name_regex = r"(?P<kernel_name>[\w\.\-%]+)"
 
 default_handlers = [
     (r"/api/kernelspecs", MainKernelSpecHandler),
-    (r"/api/kernelspecs/%s" % kernel_name_regex, KernelSpecHandler),
+    (f"/api/kernelspecs/{kernel_name_regex}", KernelSpecHandler),
 ]

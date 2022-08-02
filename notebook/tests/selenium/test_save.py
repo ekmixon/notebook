@@ -40,7 +40,7 @@ def test_save(notebook):
     assert current_path == nbname
 
     displayed_name = notebook.browser.find_element_by_id('notebook_name').text
-    assert displayed_name + '.ipynb' == nbname
+    assert f'{displayed_name}.ipynb' == nbname
 
     execute_promise("Jupyter.notebook.save_checkpoint()", notebook.browser)
 

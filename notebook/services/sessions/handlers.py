@@ -78,8 +78,8 @@ class SessionRootHandler(APIHandler):
             except NoSuchKernel:
                 msg = ("The '%s' kernel is not available. Please pick another "
                        "suitable kernel instead, or install that kernel." % kernel_name)
-                status_msg = '%s not found' % kernel_name
-                self.log.warning('Kernel not found: %s' % kernel_name)
+                status_msg = f'{kernel_name} not found'
+                self.log.warning(f'Kernel not found: {kernel_name}')
                 self.set_status(501)
                 self.finish(json.dumps(dict(message=msg, short_message=status_msg)))
                 return
@@ -133,7 +133,7 @@ class SessionHandler(APIHandler):
             if model['kernel'].get('id') is not None:
                 kernel_id = model['kernel']['id']
                 if kernel_id not in km:
-                    raise web.HTTPError(400, "No such kernel: %s" % kernel_id)
+                    raise web.HTTPError(400, f"No such kernel: {kernel_id}")
                 changes['kernel_id'] = kernel_id
             elif model['kernel'].get('name') is not None:
                 kernel_name = model['kernel']['name']
@@ -174,7 +174,7 @@ class SessionHandler(APIHandler):
 _session_id_regex = r"(?P<session_id>\w+-\w+-\w+-\w+-\w+)"
 
 default_handlers = [
-    (r"/api/sessions/%s" % _session_id_regex, SessionHandler),
-    (r"/api/sessions",  SessionRootHandler)
+    (f"/api/sessions/{_session_id_regex}", SessionHandler),
+    (r"/api/sessions", SessionRootHandler),
 ]
 

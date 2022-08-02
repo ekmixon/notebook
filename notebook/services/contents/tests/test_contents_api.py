@@ -77,9 +77,7 @@ class API(object):
         return self._req('GET', path, params=params)
 
     def create_untitled(self, path='/', ext='.ipynb'):
-        body = None
-        if ext:
-            body = json.dumps({'ext': ext})
+        body = json.dumps({'ext': ext}) if ext else None
         return self._req('POST', path, body)
 
     def mkdir_untitled(self, path='/'):
@@ -151,7 +149,7 @@ class APITest(NotebookTestBase):
 
     @staticmethod
     def _txt_for_name(name):
-        return u'%s text file' % name
+        return f'{name} text file'
     
     def to_os_path(self, api_path):
         return to_os_path(api_path, root=self.notebook_dir)
@@ -215,18 +213,18 @@ class APITest(NotebookTestBase):
         for d, name in self.dirs_nbs:
             # create a notebook
             nb = new_notebook()
-            nbname = u'{}/{}.ipynb'.format(d, name)
+            nbname = f'{d}/{name}.ipynb'
             self.make_nb(nbname, nb)
             self.addCleanup(partial(self.delete_file, nbname))
 
             # create a text file
             txt = self._txt_for_name(name)
-            txtname = u'{}/{}.txt'.format(d, name)
+            txtname = f'{d}/{name}.txt'
             self.make_txt(txtname, txt)
             self.addCleanup(partial(self.delete_file, txtname))
 
             blob = self._blob_for_name(name)
-            blobname = u'{}/{}.blob'.format(d, name)
+            blobname = f'{d}/{name}.blob'
             self.make_blob(blobname, blob)
             self.addCleanup(partial(self.delete_file, blobname))
 
@@ -282,9 +280,9 @@ class APITest(NotebookTestBase):
 
     def test_get_nb_contents(self):
         for d, name in self.dirs_nbs:
-            path = url_path_join(d, name + '.ipynb')
+            path = url_path_join(d, f'{name}.ipynb')
             nb = self.api.read(path).json()
-            self.assertEqual(nb['name'], u'%s.ipynb' % name)
+            self.assertEqual(nb['name'], f'{name}.ipynb')
             self.assertEqual(nb['path'], path)
             self.assertEqual(nb['type'], 'notebook')
             self.assertIn('content', nb)
@@ -294,9 +292,9 @@ class APITest(NotebookTestBase):
 
     def test_get_nb_no_content(self):
         for d, name in self.dirs_nbs:
-            path = url_path_join(d, name + '.ipynb')
+            path = url_path_join(d, f'{name}.ipynb')
             nb = self.api.read(path, content=False).json()
-            self.assertEqual(nb['name'], u'%s.ipynb' % name)
+            self.assertEqual(nb['name'], f'{name}.ipynb')
             self.assertEqual(nb['path'], path)
             self.assertEqual(nb['type'], 'notebook')
             self.assertIn('content', nb)
@@ -327,9 +325,9 @@ class APITest(NotebookTestBase):
 
     def test_get_text_file_contents(self):
         for d, name in self.dirs_nbs:
-            path = url_path_join(d, name + '.txt')
+            path = url_path_join(d, f'{name}.txt')
             model = self.api.read(path).json()
-            self.assertEqual(model['name'], u'%s.txt' % name)
+            self.assertEqual(model['name'], f'{name}.txt')
             self.assertEqual(model['path'], path)
             self.assertIn('content', model)
             self.assertEqual(model['format'], 'text')
@@ -346,9 +344,9 @@ class APITest(NotebookTestBase):
 
     def test_get_binary_file_contents(self):
         for d, name in self.dirs_nbs:
-            path = url_path_join(d, name + '.blob')
+            path = url_path_join(d, f'{name}.blob')
             model = self.api.read(path).json()
-            self.assertEqual(model['name'], u'%s.blob' % name)
+            self.assertEqual(model['name'], f'{name}.blob')
             self.assertEqual(model['path'], path)
             self.assertIn('content', model)
             self.assertEqual(model['format'], 'base64')
@@ -513,7 +511,7 @@ class APITest(NotebookTestBase):
     def test_delete(self):
         for d, name in self.dirs_nbs:
             print('%r, %r' % (d, name))
-            resp = self.api.delete(url_path_join(d, name + '.ipynb'))
+            resp = self.api.delete(url_path_join(d, f'{name}.ipynb'))
             self.assertEqual(resp.status_code, 204)
 
         for d in self.dirs + ['/']:
@@ -539,9 +537,8 @@ class APITest(NotebookTestBase):
         try:
             self.api.delete(u'å b')
         except requests.HTTPError as e:
-            if e.response.status_code == 400:
-                if not self.can_send2trash(u'å b'):
-                    self.skipTest("Dir can't be sent to trash")
+            if e.response.status_code == 400 and not self.can_send2trash(u'å b'):
+                self.skipTest("Dir can't be sent to trash")
             raise
         # Check if directory has actually been deleted
         with assert_http_error(404):
@@ -555,7 +552,7 @@ class APITest(NotebookTestBase):
         assert self.isfile('foo/z.ipynb')
 
         nbs = notebooks_only(self.api.list('foo').json())
-        nbnames = set(n['name'] for n in nbs)
+        nbnames = {n['name'] for n in nbs}
         self.assertIn('z.ipynb', nbnames)
         self.assertNotIn('a.ipynb', nbnames)
 

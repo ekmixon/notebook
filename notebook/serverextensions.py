@@ -59,14 +59,14 @@ def toggle_serverextension_python(import_name, enabled=None, parent=None,
 
     if logger:
         if new_enabled:
-            logger.info(u"Enabling: %s" % (import_name))
+            logger.info(f"Enabling: {import_name}")
         else:
-            logger.info(u"Disabling: %s" % (import_name))
+            logger.info(f"Disabling: {import_name}")
 
     server_extensions[import_name] = new_enabled
 
     if logger:
-        logger.info(u"- Writing config: {}".format(config_dir))
+        logger.info(f"- Writing config: {config_dir}")
 
     cm.update("jupyter_notebook_config", cfg)
 
@@ -110,12 +110,12 @@ def validate_serverextension(import_name, logger=None):
     else:
         warnings.append(import_msg.format(RED_X, import_name))
 
-    post_mortem = u"      {} {} {}"
     if logger:
         if warnings:
             [logger.info(info) for info in infos]
             [logger.warn(warning) for warning in warnings]
         else:
+            post_mortem = u"      {} {} {}"
             logger.info(post_mortem.format(import_name, version, GREEN_OK))
 
     return warnings
@@ -126,7 +126,7 @@ def validate_serverextension(import_name, logger=None):
 # ----------------------------------------------------------------------
 
 flags = {}
-flags.update(BaseExtensionApp.flags)
+flags |= BaseExtensionApp.flags
 flags.pop("y", None)
 flags.pop("generate-config", None)
 flags.update({
@@ -254,11 +254,9 @@ class ListServerExtensionsApp(BaseExtensionApp):
                 .setdefault("nbserver_extensions", {})
             )
             if server_extensions:
-                print(u'config dir: {}'.format(config_dir))
+                print(f'config dir: {config_dir}')
             for import_name, enabled in server_extensions.items():
-                print(u'    {} {}'.format(
-                              import_name,
-                              GREEN_ENABLED if enabled else RED_DISABLED))
+                print(f'    {import_name} {GREEN_ENABLED if enabled else RED_DISABLED}')
                 validate_serverextension(import_name, self.log)
 
     def start(self):
@@ -293,7 +291,7 @@ class ServerExtensionApp(BaseExtensionApp):
         # The above should have called a subcommand and raised NoStart; if we
         # get here, it didn't, so we should self.log.info a message.
         subcmds = ", ".join(sorted(self.subcommands))
-        sys.exit("Please supply at least one subcommand: %s" % subcmds)
+        sys.exit(f"Please supply at least one subcommand: {subcmds}")
 
 
 main = ServerExtensionApp.launch_instance
@@ -324,7 +322,10 @@ def _get_server_extension_metadata(module):
     """
     m = import_item(module)
     if not hasattr(m, '_jupyter_server_extension_paths'):
-        raise KeyError(u'The Python module {} does not include any valid server extensions'.format(module))
+        raise KeyError(
+            f'The Python module {module} does not include any valid server extensions'
+        )
+
     return m, m._jupyter_server_extension_paths()
 
 if __name__ == '__main__':

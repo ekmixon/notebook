@@ -34,7 +34,7 @@ def bundle(handler, model):
     notebook_name = os.path.splitext(notebook_filename)[0] 
 
     # Headers
-    zip_filename = os.path.splitext(notebook_name)[0] + '.zip'
+    zip_filename = f'{os.path.splitext(notebook_name)[0]}.zip'
     handler.set_attachment_header(zip_filename)
     handler.set_header('Content-Type', 'application/zip')
 

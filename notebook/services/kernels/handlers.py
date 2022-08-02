@@ -124,13 +124,13 @@ class ZMQChannelsHandler(AuthenticatedZMQStreamHandler):
         return self.settings.get('rate_limit_window', 1.0)
 
     def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__, getattr(self, 'kernel_id', 'uninitialized'))
+        return f"{self.__class__.__name__}({getattr(self, 'kernel_id', 'uninitialized')})"
 
     def create_stream(self):
         km = self.kernel_manager
         identity = self.session.bsession
         for channel in ("iopub", "shell", "control", "stdin"):
-            meth = getattr(km, "connect_" + channel)
+            meth = getattr(km, f"connect_{channel}")
             self.channels[channel] = stream = meth(self.kernel_id, identity=identity)
             stream.channel = channel
 
@@ -235,7 +235,7 @@ class ZMQChannelsHandler(AuthenticatedZMQStreamHandler):
 
             if not both_done.done():
                 log = self.log.warning if count % 10 == 0 else self.log.debug
-                log("Nudge: attempt %s on kernel %s" % (count, self.kernel_id))
+                log(f"Nudge: attempt {count} on kernel {self.kernel_id}")
                 self.session.send(shell_channel, "kernel_info_request")
                 nonlocal nudge_handle
                 nudge_handle = loop.call_later(0.5, nudge, count)
@@ -366,9 +366,8 @@ class ZMQChannelsHandler(AuthenticatedZMQStreamHandler):
         This is likely due to a client reconnecting from a lost network connection,
         where the socket on our side has not been cleaned up yet.
         """
-        self.session_key = '%s:%s' % (self.kernel_id, self.session.session)
-        stale_handler = self._open_sessions.get(self.session_key)
-        if stale_handler:
+        self.session_key = f'{self.kernel_id}:{self.session.session}'
+        if stale_handler := self._open_sessions.get(self.session_key):
             self.log.warning("Replacing stale connection: %s", self.session_key)
             yield stale_handler.close()
         self._open_sessions[self.session_key] = self
@@ -455,6 +454,7 @@ class ZMQChannelsHandler(AuthenticatedZMQStreamHandler):
             )
             msg['channel'] = 'iopub'
             self.write_message(json.dumps(msg, default=json_default))
+
         channel = getattr(stream, 'channel', None)
         msg_type = msg['header']['msg_type']
 
@@ -484,10 +484,7 @@ class ZMQChannelsHandler(AuthenticatedZMQStreamHandler):
 
             # Increment the bytes and message count
             self._iopub_window_msg_count += 1
-            if msg_type == 'stream':
-                byte_count = sum([len(x) for x in msg_list])
-            else:
-                byte_count = 0
+            byte_count = sum(len(x) for x in msg_list) if msg_type == 'stream' else 0
             self._iopub_window_byte_count += byte_count
 
             # Queue a removal of the byte and message count for a time in the
@@ -621,7 +618,10 @@ _kernel_action_regex = r"(?P<action>restart|interrupt)"
 
 default_handlers = [
     (r"/api/kernels", MainKernelHandler),
-    (r"/api/kernels/%s" % _kernel_id_regex, KernelHandler),
-    (r"/api/kernels/%s/%s" % (_kernel_id_regex, _kernel_action_regex), KernelActionHandler),
-    (r"/api/kernels/%s/channels" % _kernel_id_regex, ZMQChannelsHandler),
+    (f"/api/kernels/{_kernel_id_regex}", KernelHandler),
+    (
+        f"/api/kernels/{_kernel_id_regex}/{_kernel_action_regex}",
+        KernelActionHandler,
+    ),
+    (f"/api/kernels/{_kernel_id_regex}/channels", ZMQChannelsHandler),
 ]

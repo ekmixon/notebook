@@ -92,9 +92,7 @@ class SessionManager(LoggingConfigurable):
     def create_session(self, path=None, name=None, type=None, kernel_name=None, kernel_id=None):
         """Creates a session and returns its model"""
         session_id = self.new_session_id()
-        if kernel_id is not None and kernel_id in self.kernel_manager:
-            pass
-        else:
+        if kernel_id is None or kernel_id not in self.kernel_manager:
             kernel_id = yield self.start_kernel_for_session(session_id, path, name, type, kernel_name)
         result = yield maybe_future(
             self.save_session(session_id, path=path, name=name, type=type, kernel_id=kernel_id)
@@ -168,12 +166,12 @@ class SessionManager(LoggingConfigurable):
             raise TypeError("must specify a column to query")
 
         conditions = []
-        for column in kwargs.keys():
+        for column in kwargs:
             if column not in self._columns:
                 raise TypeError("No such column: %r", column)
-            conditions.append("%s=?" % column)
+            conditions.append(f"{column}=?")
 
-        query = "SELECT * FROM session WHERE %s" % (' AND '.join(conditions))
+        query = f"SELECT * FROM session WHERE {' AND '.join(conditions)}"
 
         self.cursor.execute(query, list(kwargs.values()))
         try:
@@ -183,11 +181,8 @@ class SessionManager(LoggingConfigurable):
             row = None
 
         if row is None:
-            q = []
-            for key, value in kwargs.items():
-                q.append("%s=%r" % (key, value))
-
-            raise web.HTTPError(404, u'Session not found: %s' % (', '.join(q)))
+            q = ["%s=%r" % (key, value) for key, value in kwargs.items()]
+            raise web.HTTPError(404, f"Session not found: {', '.join(q)}")
 
         model = yield maybe_future(self.row_to_model(row))
         raise gen.Return(model)
@@ -215,11 +210,11 @@ class SessionManager(LoggingConfigurable):
             return
 
         sets = []
-        for column in kwargs.keys():
+        for column in kwargs:
             if column not in self._columns:
                 raise TypeError("No such column: %r" % column)
-            sets.append("%s=?" % column)
-        query = "UPDATE session SET %s WHERE session_id=?" % (', '.join(sets))
+            sets.append(f"{column}=?")
+        query = f"UPDATE session SET {', '.join(sets)} WHERE session_id=?"
         self.cursor.execute(query, list(kwargs.values()) + [session_id])
 
     def kernel_culled(self, kernel_id):
@@ -241,10 +236,10 @@ class SessionManager(LoggingConfigurable):
             self.cursor.execute("DELETE FROM session WHERE session_id=?",
                                 (row['session_id'],))
             msg = "Kernel '{kernel_id}' appears to have been culled or died unexpectedly, " \
-                  "invalidating session '{session_id}'. The session has been removed.".\
-                format(kernel_id=row['kernel_id'],session_id=row['session_id'])
+                      "invalidating session '{session_id}'. The session has been removed.".\
+                    format(kernel_id=row['kernel_id'],session_id=row['session_id'])
             if tolerate_culled:
-                self.log.warning(msg + "  Continuing...")
+                self.log.warning(f"{msg}  Continuing...")
                 raise gen.Return(None)
             raise KeyError(msg)
 

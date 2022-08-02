@@ -47,7 +47,7 @@ class NotebookTestBase(TestCase):
     @classmethod
     def wait_until_alive(cls):
         """Wait for the server to be alive"""
-        url = cls.base_url() + 'api/contents'
+        url = f'{cls.base_url()}api/contents'
         for _ in range(int(MAX_WAITTIME/POLL_INTERVAL)):
             try:
                 cls.fetch_url(url)
@@ -74,7 +74,7 @@ class NotebookTestBase(TestCase):
     def auth_headers(cls):
         headers = {}
         if cls.token:
-            headers['Authorization'] = 'token %s' % cls.token
+            headers['Authorization'] = f'token {cls.token}'
         return headers
 
     @staticmethod
@@ -89,10 +89,9 @@ class NotebookTestBase(TestCase):
         """
         headers = kwargs.setdefault('headers', {})
         headers.update(cls.auth_headers())
-        response = requests.request(verb,
-            url_path_join(cls.base_url(), path),
-            **kwargs)
-        return response
+        return requests.request(
+            verb, url_path_join(cls.base_url(), path), **kwargs
+        )
 
     @classmethod
     def get_patch_env(cls):
@@ -227,7 +226,7 @@ class UNIXSocketNotebookTestBase(NotebookTestBase):
 
     @classmethod
     def base_url(cls):
-        return '%s%s' % (urlencode_unix_socket(cls.sock), cls.url_prefix)
+        return f'{urlencode_unix_socket(cls.sock)}{cls.url_prefix}'
 
     @staticmethod
     def fetch_url(url):

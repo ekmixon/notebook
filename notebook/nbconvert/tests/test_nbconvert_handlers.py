@@ -20,9 +20,7 @@ from base64 import encodebytes
 
 def cmd_exists(cmd):
     """Check is a command exists."""
-    if shutil.which(cmd) is None:
-        return False
-    return True
+    return shutil.which(cmd) is not None
 
 
 class NbconvertAPI(object):

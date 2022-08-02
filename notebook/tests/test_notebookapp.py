@@ -72,7 +72,7 @@ def test_invalid_nb_dir():
             app.notebook_dir = tf
 
 def test_nb_dir_with_slash():
-    with TemporaryDirectory(suffix="_slash" + os.sep) as td:
+    with TemporaryDirectory(suffix=f"_slash{os.sep}") as td:
         app = NotebookApp(notebook_dir=td)
         assert not app.notebook_dir.endswith(os.sep)
 
@@ -185,7 +185,7 @@ def test_notebook_stop():
 class NotebookAppTests(NotebookTestBase):
     def test_list_running_servers(self):
         servers = list(notebookapp.list_running_servers())
-        assert len(servers) >= 1
+        assert servers
         assert self.port in {info['port'] for info in servers}
 
     def test_log_json_default(self):
@@ -199,11 +199,11 @@ class NotebookAppTests(NotebookTestBase):
 if not sys.platform.startswith('win'):
     class NotebookUnixSocketTests(UNIXSocketNotebookTestBase):
         def test_run(self):
-            self.fetch_url(self.base_url() + 'api/contents')
+            self.fetch_url(f'{self.base_url()}api/contents')
 
         def test_list_running_sock_servers(self):
             servers = list(notebookapp.list_running_servers())
-            assert len(servers) >= 1
+            assert servers
             assert self.sock in {info['sock'] for info in servers}
 
 

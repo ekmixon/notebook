@@ -116,14 +116,14 @@ def install_nbextension(path, overwrite=False, symlink=False,
     nbext = _get_nbextension_dir(user=user, sys_prefix=sys_prefix, prefix=prefix, nbextensions_dir=nbextensions_dir)
     # make sure nbextensions dir exists
     ensure_dir_exists(nbext)
-    
+
     # forcing symlink parameter to False if os.symlink does not exist (e.g., on Windows machines running python 2)
     if not hasattr(os, 'symlink'):
         symlink = False
-    
+
     if isinstance(path, (list, tuple)):
         raise TypeError("path must be a string pointing to a single extension to install; call this function multiple times to install multiple extensions")
-    
+
     path = cast_unicode_py2(path)
 
     if path.startswith(('https://', 'http://')):
@@ -134,7 +134,7 @@ def install_nbextension(path, overwrite=False, symlink=False,
             filename = urlparse(path).path.split('/')[-1]
             local_path = os.path.join(td, filename)
             if logger:
-                logger.info("Downloading: %s -> %s" % (path, local_path))
+                logger.info(f"Downloading: {path} -> {local_path}")
             urlretrieve(path, local_path)
             # now install from the local copy
             full_dest = install_nbextension(local_path, overwrite=overwrite, symlink=symlink,
@@ -145,7 +145,7 @@ def install_nbextension(path, overwrite=False, symlink=False,
         if destination:
             raise ValueError("Cannot give destination for archives")
         if logger:
-            logger.info("Extracting: %s -> %s" % (path, nbext))
+            logger.info(f"Extracting: {path} -> {nbext}")
 
         if path.endswith('.zip'):
             archive = zipfile.ZipFile(path)
@@ -162,7 +162,7 @@ def install_nbextension(path, overwrite=False, symlink=False,
         full_dest = normpath(pjoin(nbext, destination))
         if overwrite and os.path.lexists(full_dest):
             if logger:
-                logger.info("Removing: %s" % full_dest)
+                logger.info(f"Removing: {full_dest}")
             if os.path.isdir(full_dest) and not os.path.islink(full_dest):
                 shutil.rmtree(full_dest)
             else:
@@ -172,7 +172,7 @@ def install_nbextension(path, overwrite=False, symlink=False,
             path = os.path.abspath(path)
             if not os.path.exists(full_dest):
                 if logger:
-                    logger.info("Symlinking: %s -> %s" % (full_dest, path))
+                    logger.info(f"Symlinking: {full_dest} -> {path}")
                 os.symlink(path, full_dest)
         elif os.path.isdir(path):
             path = pjoin(os.path.abspath(path), '') # end in path separator
@@ -180,7 +180,7 @@ def install_nbextension(path, overwrite=False, symlink=False,
                 dest_dir = pjoin(full_dest, parent[len(path):])
                 if not os.path.exists(dest_dir):
                     if logger:
-                        logger.info("Making directory: %s" % dest_dir)
+                        logger.info(f"Making directory: {dest_dir}")
                     os.makedirs(dest_dir)
                 for file_name in files:
                     src = pjoin(parent, file_name)
@@ -210,7 +210,7 @@ def install_nbextension_python(module, overwrite=False, symlink=False,
         dest = nbext['dest']
 
         if logger:
-            logger.info("Installing %s -> %s" % (src, dest))
+            logger.info(f"Installing {src} -> {dest}")
         full_dest = install_nbextension(
             src, overwrite=overwrite, symlink=symlink,
             user=user, sys_prefix=sys_prefix, prefix=prefix, nbextensions_dir=nbextensions_dir,
@@ -256,12 +256,12 @@ def uninstall_nbextension(dest, require=None, user=False, sys_prefix=False, pref
     full_dest = pjoin(nbext, dest)
     if os.path.lexists(full_dest):
         if logger:
-            logger.info("Removing: %s" % full_dest)
+            logger.info(f"Removing: {full_dest}")
         if os.path.isdir(full_dest) and not os.path.islink(full_dest):
             shutil.rmtree(full_dest)
         else:
             os.remove(full_dest)
-    
+
     # Look through all of the config sections making sure that the nbextension
     # doesn't exist.
     config_dir = os.path.join(_get_config_dir(user=user, sys_prefix=sys_prefix), 'nbconfig')
@@ -281,7 +281,7 @@ def _find_uninstall_nbextension(filename, logger=None):
         path = pjoin(nbext, filename)
         if os.path.lexists(path):
             if logger:
-                logger.info("Removing: %s" % path)
+                logger.info(f"Removing: {path}")
             if os.path.isdir(path) and not os.path.islink(path):
                 shutil.rmtree(path)
             else:
@@ -303,7 +303,7 @@ def uninstall_nbextension_python(module,
         dest = nbext['dest']
         require = nbext['require']
         if logger:
-            logger.info("Uninstalling {} {}".format(dest, require))
+            logger.info(f"Uninstalling {dest} {require}")
         uninstall_nbextension(dest, require, user=user, sys_prefix=sys_prefix, 
             prefix=prefix, nbextensions_dir=nbextensions_dir, logger=logger)
 
@@ -335,11 +335,10 @@ def _set_nbextension_state(section, require, state,
         _get_config_dir(user=user, sys_prefix=sys_prefix), 'nbconfig')
     cm = BaseJSONConfigManager(config_dir=config_dir)
     if logger:
-        logger.info("{} {} extension {}...".format(
-            "Enabling" if state else "Disabling",
-            section,
-            require
-        ))
+        logger.info(
+            f'{"Enabling" if state else "Disabling"} {section} extension {require}...'
+        )
+
     cm.update(section, {"load_extensions": {require: state}})
 
     validate_nbextension(require, logger=logger)
@@ -516,7 +515,7 @@ def validate_nbextension(require, logger=None):
     js_exists = False
     for exts in jupyter_path('nbextensions'):
         # Does the Javascript entrypoint actually exist on disk?
-        js = u"{}.js".format(os.path.join(exts, *require.split("/")))
+        js = f'{os.path.join(exts, *require.split("/"))}.js'
         js_exists = os.path.exists(js)
         if js_exists:
             break
@@ -526,7 +525,7 @@ def validate_nbextension(require, logger=None):
         infos.append(require_tmpl.format(GREEN_OK, require))
     else:
         warnings.append(require_tmpl.format(RED_X, require))
-    
+
     if logger:
         if warnings:
             logger.warning(u"      - Validating: problems found:")
@@ -535,8 +534,8 @@ def validate_nbextension(require, logger=None):
             for msg in infos:
                 logger.info(msg)
         else:
-            logger.info(u"      - Validating: {}".format(GREEN_OK))
-    
+            logger.info(f"      - Validating: {GREEN_OK}")
+
     return warnings
 
 
@@ -567,19 +566,17 @@ def validate_nbextension_python(spec, full_dest, logger=None):
 
     section = spec.get("section", None)
     if section in NBCONFIG_SECTIONS:
-        infos.append(u"  {} section: {}".format(GREEN_OK, section))
+        infos.append(f"  {GREEN_OK} section: {section}")
     else:
-        warnings.append(u"  {}  section: {}".format(RED_X, section))
+        warnings.append(f"  {RED_X}  section: {section}")
 
     require = spec.get("require", None)
     if require is not None:
-        require_path = os.path.join(
-            full_dest[0:-len(spec["dest"])],
-            u"{}.js".format(require))
+        require_path = os.path.join(full_dest[:-len(spec["dest"])], f"{require}.js")
         if os.path.exists(require_path):
-            infos.append(u"  {} require: {}".format(GREEN_OK, require_path))
+            infos.append(f"  {GREEN_OK} require: {require_path}")
         else:
-            warnings.append(u"  {}  require: {}".format(RED_X, require_path))
+            warnings.append(f"  {RED_X}  require: {require_path}")
 
     if logger:
         if warnings:
@@ -588,9 +585,9 @@ def validate_nbextension_python(spec, full_dest, logger=None):
                 logger.warning(msg)
             for msg in infos:
                 logger.info(msg)
-            logger.warning(u"Full spec: {}".format(spec))
+            logger.warning(f"Full spec: {spec}")
         else:
-            logger.info(u"- Validating: {}".format(GREEN_OK))
+            logger.info(f"- Validating: {GREEN_OK}")
 
     return warnings
 
@@ -606,7 +603,7 @@ from .extensions import (
 from traitlets import Bool, Unicode
 
 flags = {}
-flags.update(_base_flags)
+flags |= _base_flags
 flags.update({
     "overwrite" : ({
         "InstallNBExtensionApp" : {
@@ -623,7 +620,7 @@ flags.update({
 flags['s'] = flags['symlink']
 
 aliases = {}
-aliases.update(_base_aliases)
+aliases |= _base_aliases
 aliases.update({
     "prefix" : "InstallNBExtensionApp.prefix",
     "nbextensions" : "InstallNBExtensionApp.nbextensions_dir",
@@ -675,28 +672,20 @@ class InstallNBExtensionApp(BaseExtensionApp):
         else:
             install = install_nbextension
             kwargs = {'destination': self.destination}
-        
-        full_dests = install(self.extra_args[0],
-                             overwrite=self.overwrite,
-                             symlink=self.symlink,
-                             user=self.user,
-                             sys_prefix=self.sys_prefix,
-                             prefix=self.prefix,
-                             nbextensions_dir=self.nbextensions_dir,
-                             logger=self.log,
-                             **kwargs
-                            )
 
-        if full_dests:
+        if full_dests := install(
+            self.extra_args[0],
+            overwrite=self.overwrite,
+            symlink=self.symlink,
+            user=self.user,
+            sys_prefix=self.sys_prefix,
+            prefix=self.prefix,
+            nbextensions_dir=self.nbextensions_dir,
+            logger=self.log,
+            **kwargs,
+        ):
             self.log.info(
-                u"\nTo initialize this nbextension in the browser every time"
-                " the notebook (or other app) loads:\n\n"
-                "      jupyter nbextension enable {}{}{}{}\n".format(
-                    self.extra_args[0] if self.python else "<the entry point>",
-                    " --user" if self.user else "",
-                    " --py" if self.python else "",
-                    " --sys-prefix" if self.sys_prefix else ""
-                )
+                f'\nTo initialize this nbextension in the browser every time the notebook (or other app) loads:\n\n      jupyter nbextension enable {self.extra_args[0] if self.python else "<the entry point>"}{" --user" if self.user else ""}{" --py" if self.python else ""}{" --sys-prefix" if self.sys_prefix else ""}\n'
             )
 
     def start(self):
@@ -923,11 +912,11 @@ class ListNBExtensionsApp(BaseExtensionApp):
     def list_nbextensions(self):
         """List all the nbextensions"""
         config_dirs = [os.path.join(p, 'nbconfig') for p in jupyter_config_path()]
-        
+
         print("Known nbextensions:")
-        
+
         for config_dir in config_dirs:
-            head = u'  config dir: {}'.format(config_dir)
+            head = f'  config dir: {config_dir}'
             head_shown = False
 
             cm = BaseJSONConfigManager(parent=self, config_dir=config_dir)
@@ -938,12 +927,10 @@ class ListNBExtensionsApp(BaseExtensionApp):
                         # only show heading if there is an nbextension here
                         print(head)
                         head_shown = True
-                    print(u'    {} section'.format(section))
-                    
+                    print(f'    {section} section')
+
                     for require, enabled in data['load_extensions'].items():
-                        print(u'      {} {}'.format(
-                            require,
-                            GREEN_ENABLED if enabled else RED_DISABLED))
+                        print(f'      {require} {GREEN_ENABLED if enabled else RED_DISABLED}')
                         if enabled:
                             validate_nbextension(require, logger=self.log)
     
@@ -982,7 +969,7 @@ class NBExtensionApp(BaseExtensionApp):
         # The above should have called a subcommand and raised NoStart; if we
         # get here, it didn't, so we should self.log.info a message.
         subcmds = ", ".join(sorted(self.subcommands))
-        sys.exit("Please supply at least one subcommand: %s" % subcmds)
+        sys.exit(f"Please supply at least one subcommand: {subcmds}")
 
 main = NBExtensionApp.launch_instance
 
@@ -1012,10 +999,10 @@ def _should_copy(src, dest, logger=None):
         # we add a fudge factor to work around a bug in python 2.x
         # that was fixed in python 3.x: https://bugs.python.org/issue12904
         if logger:
-            logger.warn("Out of date: %s" % dest)
+            logger.warn(f"Out of date: {dest}")
         return True
     if logger:
-        logger.info("Up to date: %s" % dest)
+        logger.info(f"Up to date: {dest}")
     return False
 
 
@@ -1034,7 +1021,7 @@ def _maybe_copy(src, dest, logger=None):
     """
     if _should_copy(src, dest, logger=logger):
         if logger:
-            logger.info("Copying: %s -> %s" % (src, dest))
+            logger.info(f"Copying: {src} -> {dest}")
         shutil.copy2(src, dest)
 
 
@@ -1079,19 +1066,19 @@ def _get_nbextension_dir(user=False, sys_prefix=False, prefix=None, nbextensions
     conflicting_set = ['{}={!r}'.format(n, v) for n, v in conflicting if v]
     if len(conflicting_set) > 1:
         raise ArgumentConflict(
-            "cannot specify more than one of user, sys_prefix, prefix, or nbextensions_dir, but got: {}"
-            .format(', '.join(conflicting_set)))
+            f"cannot specify more than one of user, sys_prefix, prefix, or nbextensions_dir, but got: {', '.join(conflicting_set)}"
+        )
+
     if user:
-        nbext = pjoin(jupyter_data_dir(), u'nbextensions')
+        return pjoin(jupyter_data_dir(), u'nbextensions')
     elif sys_prefix:
-        nbext = pjoin(ENV_JUPYTER_PATH[0], u'nbextensions')
+        return pjoin(ENV_JUPYTER_PATH[0], u'nbextensions')
     elif prefix:
-        nbext = pjoin(prefix, 'share', 'jupyter', 'nbextensions')
+        return pjoin(prefix, 'share', 'jupyter', 'nbextensions')
     elif nbextensions_dir:
-        nbext = nbextensions_dir
+        return nbextensions_dir
     else:
-        nbext = pjoin(SYSTEM_JUPYTER_PATH[0], 'nbextensions')
-    return nbext
+        return pjoin(SYSTEM_JUPYTER_PATH[0], 'nbextensions')
 
 
 def _get_nbextension_metadata(module):
@@ -1113,8 +1100,10 @@ def _get_nbextension_metadata(module):
     """
     m = import_item(module)
     if not hasattr(m, '_jupyter_nbextension_paths'):
-        raise KeyError('The Python module {} is not a valid nbextension, '
-                       'it is missing the `_jupyter_nbextension_paths()` method.'.format(module))
+        raise KeyError(
+            f'The Python module {module} is not a valid nbextension, it is missing the `_jupyter_nbextension_paths()` method.'
+        )
+
     nbexts = m._jupyter_nbextension_paths()
     return m, nbexts
 

@@ -57,7 +57,7 @@ def pkg_commit_hash(pkg_path):
             else:
                 return u'', u''
         par_path = p.dirname(par_path)
-                
+
     return u'', u''
 
 

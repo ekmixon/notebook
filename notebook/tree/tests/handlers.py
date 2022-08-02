@@ -26,13 +26,9 @@ class TreeHandler(IPythonHandler):
     def generate_page_title(self, path):
         comps = path.split('/')
         if len(comps) > 3:
-            for i in range(len(comps)-2):
+            for _ in range(len(comps)-2):
                 comps.pop(0)
-        page_title = url_path_join(*comps)
-        if page_title:
-            return page_title+'/'
-        else:
-            return 'Home'
+        return f'{page_title}/' if (page_title := url_path_join(*comps)) else 'Home'
 
     @web.authenticated
     def get(self, path=''):
@@ -72,6 +68,6 @@ class TreeHandler(IPythonHandler):
 
 
 default_handlers = [
-    (r"/tree%s" % path_regex, TreeHandler),
+    (f"/tree{path_regex}", TreeHandler),
     (r"/tree", TreeHandler),
-    ]
+]

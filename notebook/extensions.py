@@ -1,5 +1,6 @@
 """Utilities for installing extensions"""
 
+
 # Copyright (c) Jupyter Development Team.
 # Distributed under the terms of the Modified BSD License.
 
@@ -16,7 +17,7 @@ class ArgumentConflict(ValueError):
     pass
 
 _base_flags = {}
-_base_flags.update(JupyterApp.flags)
+_base_flags |= JupyterApp.flags
 _base_flags.pop("y", None)
 _base_flags.pop("generate-config", None)
 _base_flags.update({
@@ -45,7 +46,7 @@ _base_flags.update({
 _base_flags['python'] = _base_flags['py']
 
 _base_aliases = {}
-_base_aliases.update(JupyterApp.aliases)
+_base_aliases |= JupyterApp.aliases
 
 
 class BaseExtensionApp(JupyterApp):
@@ -65,7 +66,10 @@ class BaseExtensionApp(JupyterApp):
     def _verbose_changed(self):
         """Warn about verbosity changes"""
         import warnings
-        warnings.warn("`verbose` traits of `{}` has been deprecated, has no effects and will be removed in notebook 5.0.".format(type(self).__name__), DeprecationWarning)
+        warnings.warn(
+            f"`verbose` traits of `{type(self).__name__}` has been deprecated, has no effects and will be removed in notebook 5.0.",
+            DeprecationWarning,
+        )
 
     def _log_format_default(self):
         """A default format for messages"""
@@ -88,12 +92,11 @@ def _get_config_dir(user=False, sys_prefix=False):
     if user and sys_prefix:
         raise ArgumentConflict("Cannot specify more than one of user or sys_prefix")
     if user:
-        nbext = jupyter_config_dir()
+        return jupyter_config_dir()
     elif sys_prefix:
-        nbext = ENV_CONFIG_PATH[0]
+        return ENV_CONFIG_PATH[0]
     else:
-        nbext = SYSTEM_CONFIG_PATH[0]
-    return nbext
+        return SYSTEM_CONFIG_PATH[0]
 
 # Constants for pretty print extension listing function.
 # Window doesn't support coloring in the commandline

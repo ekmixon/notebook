@@ -334,17 +334,14 @@ class ContentsManager(LoggingConfigurable):
         basename, dot, ext = filename.rpartition('.')
         if ext != 'ipynb':
                 basename, dot, ext = filename.partition('.')
-                
+
         suffix = dot + ext
 
         for i in itertools.count():
-            if i:
-                insert_i = '{}{}'.format(insert, i)
-            else:
-                insert_i = ''
+            insert_i = f'{insert}{i}' if i else ''
             name = u'{basename}{insert}{suffix}'.format(basename=basename,
                 insert=insert_i, suffix=suffix)
-            if not self.exists(u'{}/{}'.format(path, name)):
+            if not self.exists(f'{path}/{name}'):
                 break
         return name
 
@@ -369,17 +366,17 @@ class ContentsManager(LoggingConfigurable):
         """
         path = path.strip('/')
         if not self.dir_exists(path):
-            raise HTTPError(404, 'No such directory: %s' % path)
-        
+            raise HTTPError(404, f'No such directory: {path}')
+
         model = {}
         if type:
             model['type'] = type
-        
+
         if ext == '.ipynb':
             model.setdefault('type', 'notebook')
         else:
             model.setdefault('type', 'file')
-        
+
         insert = ''
         if model['type'] == 'directory':
             untitled = self.untitled_directory
@@ -391,7 +388,7 @@ class ContentsManager(LoggingConfigurable):
             untitled = self.untitled_file
         else:
             raise HTTPError(400, "Unexpected model type: %r" % model['type'])
-        
+
         name = self.increment_filename(untitled + ext, path, insert=insert)
         path = u'{0}/{1}'.format(path, name)
         return self.new(model, path)

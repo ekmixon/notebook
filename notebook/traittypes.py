@@ -66,20 +66,14 @@ except ImportError:
         if isinstance(article, str):
             article = article.lower()
 
-        if not inspect.isclass(value):
-            typename = type(value).__name__
-        else:
-            typename = value.__name__
+        typename = value.__name__ if inspect.isclass(value) else type(value).__name__
         if verbose:
             typename = _prefix(value) + typename
 
         if article == "the" or (article is None and not inspect.isclass(value)):
             if name is not None:
-                result = "{} {}".format(typename, name)
-                if article is not None:
-                    return add_article(result, True, capital)
-                else:
-                    return result
+                result = f"{typename} {name}"
+                return add_article(result, True, capital) if article is not None else result
             else:
                 tick_wrap = False
                 if inspect.isclass(value):
@@ -103,9 +97,7 @@ except ImportError:
                 return describe(article, value, name=name,
                     verbose=verbose, capital=capital)
         elif article in ("a", "an") or article is None:
-            if article is None:
-                return typename
-            return add_article(typename, False, capital)
+            return typename if article is None else add_article(typename, False, capital)
         else:
             raise ValueError("The 'article' argument should "
                 "be 'the', 'a', 'an', or None not %r" % article)
@@ -125,17 +117,11 @@ except ImportError:
             its first letter capitalized or not.
         """
         if definite:
-            result = "the " + name
+            result = f"the {name}"
         else:
             first_letters = re.compile(r'[\W_]+').sub('', name)
-            if first_letters[:1].lower() in 'aeiou':
-                result = 'an ' + name
-            else:
-                result = 'a ' + name
-        if capital:
-            return result[0].upper() + result[1:]
-        else:
-            return result
+            result = f'an {name}' if first_letters[:1].lower() in 'aeiou' else f'a {name}'
+        return result[0].upper() + result[1:] if capital else result
 
 
 class TypeFromClasses(ClassBasedTraitType):
@@ -211,13 +197,11 @@ class TypeFromClasses(ClassBasedTraitType):
         result = "a subclass of "
         for klass in self.klasses:
             if not isinstance(klass, str):
-                klass = klass.__module__ + '.' + klass.__name__
+                klass = f'{klass.__module__}.{klass.__name__}'
             result += f"{klass} or "
         # Strip the last "or"
         result = result.strip(" or ")
-        if self.allow_none:
-            return result + ' or None'
-        return result
+        return f'{result} or None' if self.allow_none else result
 
     def instance_init(self, obj):
         self._resolve_classes()
@@ -309,10 +293,7 @@ class InstanceFromClasses(ClassBasedTraitType):
     def info(self):
         result = "an instance of "
         for klass in self.klasses:
-            if isinstance(klass, str):
-                result += klass
-            else:
-                result += describe("a", klass)
+            result += klass if isinstance(klass, str) else describe("a", klass)
             result += " or "
         result = result.strip(" or ")
         if self.allow_none:

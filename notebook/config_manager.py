@@ -44,9 +44,8 @@ def remove_defaults(data, defaults):
                 remove_defaults(data[key], defaults[key])
                 if not data[key]:  # prune empty subdicts
                     del data[key]
-            else:
-                if value == defaults[key]:
-                    del data[key]
+            elif value == defaults[key]:
+                del data[key]
 
 
 class BaseJSONConfigManager(LoggingConfigurable):
@@ -69,11 +68,11 @@ class BaseJSONConfigManager(LoggingConfigurable):
 
     def file_name(self, section_name):
         """Returns the json filename for the section_name: {config_dir}/{section_name}.json"""
-        return os.path.join(self.config_dir, section_name+'.json')
+        return os.path.join(self.config_dir, f'{section_name}.json')
 
     def directory(self, section_name):
         """Returns the directory name for the section name: {config_dir}/{section_name}.d"""
-        return os.path.join(self.config_dir, section_name+'.d')
+        return os.path.join(self.config_dir, f'{section_name}.d')
 
     def get(self, section_name, include_root=True):
         """Retrieve the config data for the specified section.

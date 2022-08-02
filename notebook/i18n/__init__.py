@@ -38,10 +38,7 @@ def parse_accept_lang_header(accept_lang):
         lang, qvalue = m.group('lang', 'qvalue')
         # Browser header format is zh-CN, gettext uses zh_CN
         lang = lang.replace('-', '_')
-        if qvalue is None:
-            qvalue = 1.
-        else:
-            qvalue = float(qvalue)
+        qvalue = 1. if qvalue is None else float(qvalue)
         if qvalue == 0:
             continue  # 0 means not accepted
         by_q[qvalue].append(lang)
@@ -91,7 +88,7 @@ def combine_translations(accept_language, domain='nbjs'):
             # en is default, all translations are in frontend.
             combined.clear()
         else:
-            combined.update(cached_load(language, domain))
+            combined |= cached_load(language, domain)
 
     combined[''] = {"domain":"nbjs"}
 

@@ -6,7 +6,7 @@ def test_dualmode_arrows(notebook):
     # Tests in command mode.
     # Setting up the cells to test the keys to move up.
     notebook.to_command_mode()
-    [notebook.body.send_keys("b") for i in range(3)]
+    [notebook.body.send_keys("b") for _ in range(3)]
 
     # Use both "k" and up arrow keys to moving up and enter a value.
     # Once located on the top cell, use the up arrow keys to prove the top cell is still selected.
@@ -33,8 +33,8 @@ def test_dualmode_arrows(notebook):
     assert notebook.get_cells_contents() == ["0 edit #1", "1", "2", ""]
 
     # Setting up the cells to test the keys to move down
-    [notebook.body.send_keys("j") for i in range(3)]
-    [notebook.body.send_keys("a") for i in range(2)]
+    [notebook.body.send_keys("j") for _ in range(3)]
+    [notebook.body.send_keys("a") for _ in range(2)]
     notebook.body.send_keys("k")
 
     # Use both "j" key and down arrow keys to moving down and enter a value.
@@ -76,8 +76,12 @@ def test_dualmode_arrows(notebook):
 
     # Tests in edit mode.
     # First, erase the previous content and then setup the cells to test the keys to move up.
-    [notebook.browser.find_element_by_class_name("fa-cut.fa").click() for i in range(6)]
-    [notebook.body.send_keys("b") for i in range(2)]
+    [
+        notebook.browser.find_element_by_class_name("fa-cut.fa").click()
+        for _ in range(6)
+    ]
+
+    [notebook.body.send_keys("b") for _ in range(2)]
     notebook.body.send_keys("a")
     notebook.body.send_keys(Keys.ENTER)
 
@@ -87,7 +91,7 @@ def test_dualmode_arrows(notebook):
     notebook.body.send_keys(Keys.UP)
     notebook.body.send_keys("1")
     notebook.body.send_keys(Keys.LEFT)
-    [notebook.body.send_keys(Keys.UP) for i in range(2)]
+    [notebook.body.send_keys(Keys.UP) for _ in range(2)]
     notebook.body.send_keys("0")
 
     # Use the down arrow key to move down and enter a value.
@@ -97,7 +101,7 @@ def test_dualmode_arrows(notebook):
     notebook.body.send_keys(Keys.RIGHT)
     notebook.body.send_keys(Keys.DOWN)
     notebook.body.send_keys("2")
-    [notebook.body.send_keys(Keys.DOWN) for i in range(2)]
+    [notebook.body.send_keys(Keys.DOWN) for _ in range(2)]
     notebook.body.send_keys("3")
     notebook.to_command_mode()
     assert notebook.get_cells_contents() == ["0", "1", "2", "3"]
